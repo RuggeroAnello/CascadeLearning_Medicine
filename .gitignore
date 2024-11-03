@@ -163,3 +163,4 @@ cython_debug/
 
 # Exclude datasets
 data/*
+.data/
