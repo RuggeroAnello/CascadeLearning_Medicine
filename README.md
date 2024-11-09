@@ -12,6 +12,10 @@ This repository contains several branches:
 - "development_-name-"  : The personal branches can be used as a sandbox to try some ideas. Should regularly be updated from the main branch.
 - "development_-issue-" : In these branches predefined tasks defined in notion are worked on. The origin of these branches is the main branch. When the task is finised in the main branch is pushed again.
 
+The folders in the repository are structured as follows:
+- "data"                : Contains the dataset and the modified csv files.
+- "data_analysis"       : Contains the exploratory data analysis code.
+
 ## Prerequistes
 
 ### Dataset Download
