@@ -162,5 +162,4 @@ cython_debug/
 #.idea/
 
 # Exclude datasets
-data/*
-.data/*
+data/CheXpert-v1.0-small/*
