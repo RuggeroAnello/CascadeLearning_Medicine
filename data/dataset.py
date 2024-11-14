@@ -44,6 +44,7 @@ class CheXpertDataset(Dataset):
 
         # Load dict with labels
         samples = {
+            # TODO (FB): add patient ID
             "image": img_path,
             "sex": self.data.iloc[idx, 1],
             "age": self.data.iloc[idx, 2],
