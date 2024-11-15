@@ -13,15 +13,16 @@ This repository contains several branches:
 - "development_-issue-" : In these branches predefined tasks defined in notion are worked on. The origin of these branches is the main branch. When the task is finised in the main branch is pushed again.
 
 The folders in the repository are structured as follows:
-- "data"                : Contains the dataset and the modified csv files.
+- "data"                : Contains the modified csv files.
 - "data_analysis"       : Contains the exploratory data analysis code.
+- "model"                 : Contains the code for all models.
 
 ## Prerequistes
 
 ### Dataset Download
 
 In order to work with the CheXpert small dataset is has to be downloaded first:
-1. Go to `./data/`: `cd ./data/`
+1. Go to `../image_data/` relative to this repository: `cd ../image_data/`. If it not exists create it: `mkdir image_data`
 2. Download the CheXpert-v1.0-small dataset: `curl -L -o ./archive.zip https://www.kaggle.com/api/v1/datasets/download/willarevalo/chexpert-v10-small`
 3. Extract the dataset to `data`:  `unzip archive.zip`
 
