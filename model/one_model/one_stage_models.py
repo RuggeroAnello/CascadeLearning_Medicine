@@ -2,6 +2,7 @@ import torch
 import torchvision
 import os
 import torch.nn.functional as F
+from torch.utils.data import WeightedRandomSampler
 
 from tqdm import tqdm
 
@@ -90,8 +91,32 @@ class AbstractOneStageModel(torch.nn.Module):
     def _configure_optimizer(self, learning_rate=1e-3):
         optim = torch.optim.Adam(self.parameters(), learning_rate)
         return optim
+    
+    def apply_sampling(self, images, targets):
+        """
+        Apply WeightedRandomSampler to handle class imbalance in the batch.
+        """
+        # Get class frequencies
+        class_counts = torch.bincount(targets)
+        total_samples = len(targets)
 
-    def train(self, train_dataset, val_dataset, loss_fn, tb_logger, epochs=10):
+        # Calculate weights for each class (inverse frequency)
+        class_weights = 1. / class_counts.float()
+        sample_weights = class_weights[targets]
+
+        # Create WeightedRandomSampler
+        sampler = WeightedRandomSampler(weights=sample_weights, num_samples=total_samples, replacement=True)
+
+        # Sample the indices from the sampler
+        sampled_indices = list(sampler)
+        
+        # Use the sampled indices to get the images and targets
+        images = images[sampled_indices]
+        targets = targets[sampled_indices]
+
+        return images, targets
+
+    def train(self, train_dataset, val_dataset, loss_fn, tb_logger, epochs=10, sampling=False):
         # Create data loaders
         train_loader = torch.utils.data.DataLoader(
             train_dataset, batch_size=self.batch_size, shuffle=True
@@ -105,8 +130,8 @@ class AbstractOneStageModel(torch.nn.Module):
         )
         validation_loss = 0
         self.model = self.model.to(self.device)
-        for epoch in range(epochs):
 
+        for epoch in range(epochs):
             # Train
             training_loop = tqdm(
                 enumerate(train_loader),
@@ -116,6 +141,11 @@ class AbstractOneStageModel(torch.nn.Module):
             )
             training_loss = 0
             for train_iteration, batch in training_loop:
+                # Optionally apply WeightedRandomSampler during training
+                if sampling:
+                    images, targets = batch
+                    images, targets = self.apply_sampling(images, targets)
+
                 optimizer.zero_grad()
                 loss = self._training_step(batch, loss_fn)
                 loss.backward()
@@ -147,9 +177,7 @@ class AbstractOneStageModel(torch.nn.Module):
             validation_loss = 0
             with torch.no_grad():
                 for val_iteration, batch in val_loop:
-                    loss = self._validation_step(
-                        batch, loss_fn
-                    )  # You need to implement this function.
+                    loss = self._validation_step(batch, loss_fn)  # You need to implement this function.
                     validation_loss += loss.item()
 
                     # Update the progress bar.
