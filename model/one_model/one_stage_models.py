@@ -91,8 +91,8 @@ class AbstractOneStageModel(torch.nn.Module):
         # loss
         loss = loss_fn(out, targets)
 
-        preds = torch.round(out, decimals=0)
-        n_correct = (targets == preds).sum()
+        # TODO calculate n_correct
+        n_correct = 0
         return loss, n_correct
 
     def _general_end(self, outputs, mode):
