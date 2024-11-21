@@ -218,7 +218,7 @@ class ResNet50OneStage(AbstractOneStageModel):
         self,
         params: dict,
         input_channels: int = 1,
-        num_classes: int = None,
+        num_labels: int = None,
         **kwargs,
     ):
         """
@@ -227,7 +227,7 @@ class ResNet50OneStage(AbstractOneStageModel):
         Args:
             params (dict): Dictionary containing the hyperparameters.
             # input_size (np.array): Size of the input image. Shape: [channels, height, width]
-            num_classes (int): Number of classes in the dataset
+            num_labels (int): Number of classes in the dataset
         """
         super().__init__(
             params=params,
@@ -252,7 +252,7 @@ class ResNet50OneStage(AbstractOneStageModel):
         # Replace the output layer
         self.model.fc = torch.nn.Linear(
             self.model.fc.in_features,
-            num_classes,
+            num_labels,
         )
 
         # Set device
@@ -272,7 +272,7 @@ class ResNet18OneStage(AbstractOneStageModel):
         self,
         params: dict,
         input_channels: int = 1,
-        num_classes: int = None,
+        num_labels: int = None,
         **kwargs,
     ):
         """
@@ -281,7 +281,7 @@ class ResNet18OneStage(AbstractOneStageModel):
         Args:
             params (dict): Dictionary containing the hyperparameters.
             # input_size (np.array): Size of the input image. Shape: [channels, height, width]
-            num_classes (int): Number of classes in the dataset
+            num_labels (int): Number of classes in the dataset
         """
         super().__init__(
             params=params,
@@ -303,7 +303,7 @@ class ResNet18OneStage(AbstractOneStageModel):
             )
 
         # Replace the output layer
-        self.model.fc = torch.nn.Linear(self.model.fc.in_features, num_classes)
+        self.model.fc = torch.nn.Linear(self.model.fc.in_features, num_labels)
 
         # Set device
         self.model.to(self.device)
