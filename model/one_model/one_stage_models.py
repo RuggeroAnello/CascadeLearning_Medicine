@@ -1,3 +1,4 @@
+import json
 import torch
 import torchvision
 import os
@@ -7,7 +8,6 @@ from tqdm import tqdm
 
 
 class AbstractOneStageModel(torch.nn.Module):
-
     def __init__(
         self,
         params: dict,
@@ -32,12 +32,28 @@ class AbstractOneStageModel(torch.nn.Module):
             self.batch_size = params["batch_size"]
         if "num_epochs" in params:
             self.num_epochs = params["num_epochs"]
+        if "optimizer" in params:
+            self.optimizer = params["optimizer"]
+        if "loss_fn" in params:
+            self.loss_fn = params["loss_fn"]
+        if "save_epoch" in params:
+            self.save_epoch = params["save_epoch"]
         # TODO add more hyperparameters if needed
+
+        # Save hyperparameters
+        self.params = params
+
+        # Save results
+        self.results = {}
 
     def forward(self, x):
         raise NotImplementedError
 
-    def save_model(self, path: str):
+    @property
+    def name(self):
+        raise NotImplementedError
+
+    def save_model(self, path: str, epoch: int = None):
         """
         Save the model and its weights to the given path.
 
@@ -47,10 +63,23 @@ class AbstractOneStageModel(torch.nn.Module):
         model = self.model.to("cpu")
         if not os.path.exists(os.path.dirname(path)):
             os.makedirs(os.path.dirname(path))
+        if epoch is not None:
+            path = os.path.join(path, f"model_epoch_{epoch}.pth")
+        else:
+            path = os.path.join(path, "model.pth")
         torch.save(model.state_dict(), path)
 
-    def _general_step(self, batch, loss_fn=F.cross_entropy):
+    def save_hparams(self, path: str):
+        if not os.path.exists(os.path.dirname(path)):
+            os.makedirs(os.path.dirname(path))
+        path = os.path.join(path, "hparams.json")
+        with open(path, "w") as f:
+            json.dump(self.params, f)
 
+    def load_hparams(self, path: str):
+        self.params = json.load(open(path, "r"))
+
+    def _general_step(self, batch, loss_fn=F.cross_entropy):
         images, targets = batch
 
         # load X, y to device!
@@ -62,7 +91,7 @@ class AbstractOneStageModel(torch.nn.Module):
         # loss
         loss = loss_fn(out, targets)
 
-        preds = out.argmax(axis=1)
+        preds = torch.round(out, decimals=0)
         n_correct = (targets == preds).sum()
         return loss, n_correct
 
@@ -81,17 +110,20 @@ class AbstractOneStageModel(torch.nn.Module):
 
     def _validation_step(self, batch, loss_fn=F.cross_entropy):
         loss, n_correct = self._general_step(batch, loss_fn=loss_fn)
-        return loss
+        return loss, n_correct
 
     def _test_step(self, batch, loss_fn=F.cross_entropy):
         loss, n_correct = self._general_step(batch, loss_fn=loss_fn)
         return loss
 
     def _configure_optimizer(self, learning_rate=1e-3):
-        optim = torch.optim.Adam(self.parameters(), learning_rate)
+        if self.optimizer == "adam":
+            optim = torch.optim.Adam(self.parameters(), learning_rate)
+        else:
+            optim = torch.optim.Adam(self.parameters(), learning_rate)
         return optim
 
-    def train(self, train_dataset, val_dataset, loss_fn, tb_logger, epochs=10):
+    def train(self, train_dataset, val_dataset, tb_logger, path):
         # Create data loaders
         train_loader = torch.utils.data.DataLoader(
             train_dataset, batch_size=self.batch_size, shuffle=True
@@ -101,12 +133,15 @@ class AbstractOneStageModel(torch.nn.Module):
         )
         optimizer = self._configure_optimizer()
         scheduler = torch.optim.lr_scheduler.StepLR(
-            optimizer, step_size=epochs * len(train_loader) / 5, gamma=0.7
+            optimizer, step_size=self.num_epochs * len(train_loader) / 5, gamma=0.7
         )
         validation_loss = 0
-        self.model = self.model.to(self.device)
-        for epoch in range(epochs):
+        # Configure loss function
+        if self.loss_fn == "torch.nn.BCEWithLogitsLoss()":
+            loss_fn = torch.nn.BCEWithLogitsLoss()
 
+        self.model = self.model.to(self.device)
+        for epoch in range(self.num_epochs):
             # Train
             training_loop = tqdm(
                 enumerate(train_loader),
@@ -127,12 +162,11 @@ class AbstractOneStageModel(torch.nn.Module):
                 # Update the progress bar.
                 training_loop.set_postfix(
                     train_loss="{:.8f}".format(training_loss / (train_iteration + 1)),
-                    val_loss="{:.8f}".format(validation_loss),
                 )
 
                 # Update the tensorboard logger.
                 tb_logger.add_scalar(
-                    f"train_loss",
+                    "Loss/train",
                     loss.item(),
                     epoch * len(train_loader) + train_iteration,
                 )
@@ -145,30 +179,41 @@ class AbstractOneStageModel(torch.nn.Module):
                 ncols=200,
             )
             validation_loss = 0
+            total_correct = 0
             with torch.no_grad():
                 for val_iteration, batch in val_loop:
-                    loss = self._validation_step(
+                    loss, n_correct = self._validation_step(
                         batch, loss_fn
                     )  # You need to implement this function.
                     validation_loss += loss.item()
+                    total_correct += n_correct.item()
 
-                    # Update the progress bar.
                     val_loop.set_postfix(
-                        val_loss="{:.8f}".format(validation_loss / (val_iteration + 1))
+                        val_loss="{:.8f}".format(validation_loss / (val_iteration + 1)),
                     )
 
                     # Update the tensorboard logger.
                     tb_logger.add_scalar(
-                        f"val_loss",
+                        "Loss/val",
                         validation_loss / (val_iteration + 1),
                         epoch * len(val_loader) + val_iteration,
                     )
+
+                if self.save_epoch and epoch % self.save_epoch == 0 and epoch != 0:
+                    save_path = os.path.join(path)
+                    self.save_model(save_path, epoch)
+
             # This value is for the progress bar of the training loop.
             validation_loss /= len(val_loader)
+            validation_acc = 100.0 * total_correct / len(val_loader.dataset)
+            tb_logger.add_scalar(
+                "Acc/acc",
+                validation_acc,
+                epoch * len(val_loader) + val_iteration,
+            )
 
 
 class ResNet50OneStage(AbstractOneStageModel):
-
     def __init__(
         self,
         params: dict,
@@ -205,8 +250,10 @@ class ResNet50OneStage(AbstractOneStageModel):
             )
 
         # Replace the output layer
-        self.model.fc = torch.nn.Linear(self.model.fc.in_features, num_classes)
-        print(self.model)
+        self.model.fc = torch.nn.Linear(
+            self.model.fc.in_features,
+            num_classes,
+        )
 
         # Set device
         self.model.to(self.device)
@@ -215,9 +262,12 @@ class ResNet50OneStage(AbstractOneStageModel):
         x = x.to(self.device)
         return self.model(x)
 
+    @property
+    def name(self):
+        return "ResNet50OneStage"
+
 
 class ResNet18OneStage(AbstractOneStageModel):
-
     def __init__(
         self,
         params: dict,
@@ -254,7 +304,6 @@ class ResNet18OneStage(AbstractOneStageModel):
 
         # Replace the output layer
         self.model.fc = torch.nn.Linear(self.model.fc.in_features, num_classes)
-        print(self.model)
 
         # Set device
         self.model.to(self.device)
@@ -262,3 +311,7 @@ class ResNet18OneStage(AbstractOneStageModel):
     def forward(self, x):
         x = x.to(self.device)
         return self.model(x)
+
+    @property
+    def name(self):
+        return "ResNet18OneStage"

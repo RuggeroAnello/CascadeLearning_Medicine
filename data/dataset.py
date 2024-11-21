@@ -40,7 +40,6 @@ class CheXpertDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-
         # Load image
         img_path = os.path.join(self.root_dir, self.data.iloc[idx, 0])
 
@@ -54,5 +53,7 @@ class CheXpertDataset(Dataset):
         samples = np.zeros(len(self.targets))
         for i, key in enumerate(self.targets.values()):
             samples[i] = self.data.iloc[idx, key]
+
+        # if only one sample cahnge shape to [1,1] instead of [1]
 
         return img, samples
