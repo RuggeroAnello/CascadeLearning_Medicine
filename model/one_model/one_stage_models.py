@@ -1,12 +1,13 @@
 import torch
+import json
 import torchvision
 import os
+import numpy as np
 import torch.nn.functional as F
-from torch.utils.data import WeightedRandomSampler
+from torch.utils.data import DataLoader, WeightedRandomSampler
 from tqdm import tqdm
 
 class AbstractOneStageModel(torch.nn.Module):
-
     def __init__(
         self,
         params: dict,
@@ -23,27 +24,41 @@ class AbstractOneStageModel(torch.nn.Module):
         super().__init__()
         # Set device
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.class_weights = None  # Initialize class_weights for WeightedRandomSampler
 
         # Set hyperparameters
-        self.lr = params.get("lr", 1e-3)
-        self.batch_size = params.get("batch_size", 32)
-        self.num_epochs = params.get("num_epochs", 10)
+        if "lr" in params:
+            self.lr = params["lr"]
+        if "batch_size" in params:
+            self.batch_size = params["batch_size"]
+        if "num_epochs" in params:
+            self.num_epochs = params["num_epochs"]
+        if "optimizer" in params:
+            self.optimizer = params["optimizer"]
+        if "loss_fn" in params:
+            self.loss_fn = params["loss_fn"]
+        if "save_epoch" in params:
+            self.save_epoch = params["save_epoch"]
+        if "use_weighted_sample" in params:
+            self.use_weighted_sampler = params["use_weighted_sampler"]
         # TODO add more hyperparameters if needed
+
+        ### Wouldn't it be better to just self.x = params.get('x', default_value)?
+
+        # Save hyperparameters
+        self.params = params
+
+        # Save results
+        self.results = {}
 
     def forward(self, x):
         raise NotImplementedError
 
-    def get_sample_weights(self, batch, class_weights):
-        _, targets = batch 
-        valid_targets = targets[targets != -1.]  
+    @property
+    def name(self):
+        raise NotImplementedError
 
-        # Convert target to integer before indexing class_weights
-        sample_weights = [class_weights[int(target.item())] if int(target.item()) < len(class_weights) else 0 for target in valid_targets]
-
-        return torch.tensor(sample_weights)
-
-
-    def save_model(self, path: str):
+    def save_model(self, path: str, epoch: int = None):
         """
         Save the model and its weights to the given path.
 
@@ -53,25 +68,52 @@ class AbstractOneStageModel(torch.nn.Module):
         model = self.model.to("cpu")
         if not os.path.exists(os.path.dirname(path)):
             os.makedirs(os.path.dirname(path))
+        if epoch is not None:
+            path = os.path.join(path, f"model_epoch_{epoch}.pth")
+        else:
+            path = os.path.join(path, "model.pth")
         torch.save(model.state_dict(), path)
 
-    def _general_step(self, batch, loss_fn=F.cross_entropy, class_weights=None):
+    def save_hparams(self, path: str):
+        if not os.path.exists(os.path.dirname(path)):
+            os.makedirs(os.path.dirname(path))
+        path = os.path.join(path, "hparams.json")
+        with open(path, "w") as f:
+            json.dump(self.params, f)
+
+    def load_hparams(self, path: str):
+        self.params = json.load(open(path, "r"))
+
+    def create_weighted_sampler(self, dataset):
+        """
+        Create a WeightedRandomSampler for class imbalance.
+        Args: dataset (Dataset): PyTorch dataset with `targets` attribute.
+        Returns: WeightedRandomSampler: Sampler for the DataLoader.
+        """
+        if hasattr(dataset, "targets"):
+            targets = dataset.targets  
+            class_sample_count = np.array([np.sum(targets == t) for t in np.unique(targets)])
+            class_weights = 1.0 / class_sample_count
+            sample_weights = np.array([class_weights[t] for t in targets])
+
+            sampler = WeightedRandomSampler(
+                weights=torch.tensor(sample_weights, dtype=torch.float32),
+                num_samples=len(sample_weights),
+                replacement=True,
+            )
+            return sampler
+
+    def _general_step(self, batch, loss_fn=F.cross_entropy):
         images, targets = batch
-        valid_mask = targets != -1.
-        """
-         !! Excluding -1 values (for testing purposes), implement a way to handle that else we lose much data !!
-        """
-        valid_images, valid_targets = images[valid_mask].to(self.device), targets[valid_mask].to(self.device)
-
-        out = self.forward(valid_images)
-
-        if class_weights is not None:
-            loss = loss_fn(out, valid_targets, weight=class_weights)
-        else:
-            loss = loss_fn(out, valid_targets)
-
+        # load X, y to device!
+        images, targets = images.to(self.device), targets.to(self.device)
+        # forward pass
+        out = self.forward(images)
+        # loss
+        loss = loss_fn(out, targets)
+        # calculate n_correct
         preds = out.argmax(dim=1)
-        n_correct = (preds == valid_targets).sum().item()
+        n_correct = (preds == targets).sum().item()
         return loss, n_correct
 
     def _general_end(self, outputs, mode):
@@ -83,92 +125,110 @@ class AbstractOneStageModel(torch.nn.Module):
         acc = total_correct / len(self.dataset[mode])
         return avg_loss, acc
 
+    def _training_step(self, batch, loss_fn):
+        loss, n_correct = self._general_step(batch, loss_fn=loss_fn)
+        return loss
+
+    def _validation_step(self, batch, loss_fn=F.cross_entropy):
+        loss, n_correct = self._general_step(batch, loss_fn=loss_fn)
+        return loss, n_correct
+
+    def _test_step(self, batch, loss_fn=F.cross_entropy):
+        loss, n_correct = self._general_step(batch, loss_fn=loss_fn)
+        return loss
+
     def _configure_optimizer(self, learning_rate=1e-3):
-        optim = torch.optim.Adam(self.parameters(), learning_rate)
+        if self.optimizer == "adam":
+            optim = torch.optim.Adam(self.parameters(), learning_rate)
+        else:
+            optim = torch.optim.Adam(self.parameters(), learning_rate)
         return optim
 
-    def train(self, train_dataset, val_dataset, loss_fn, tb_logger, epochs=None, weighted_sampling=False):
-        epochs = epochs or self.num_epochs
-
-        # Compute class weights
-        class_counts = {}
-        for _, targets in train_dataset:
-            valid_targets = targets[targets != -1.]
-            for target in valid_targets:
-                class_counts[target.item()] = class_counts.get(target.item(), 0) + 1
-
-        total_samples = sum(class_counts.values())
-        class_weights = {label: total_samples / count for label, count in class_counts.items()}
-        class_weights = torch.tensor(list(class_weights.values())).float().to(self.device)
-
-        # DataLoaders with or without Weighted Sampling
-        if weighted_sampling:
-            sample_weights = []
-            for batch in train_dataset:
-                batch_weights = self.get_sample_weights(batch, class_weights)
-                sample_weights.extend(batch_weights)
-
-            sampler = WeightedRandomSampler(
-                weights=sample_weights,
-                num_samples=len(train_dataset),
-                replacement=True
+    def train(self, train_dataset, val_dataset, tb_logger, path):
+        """
+        Train the model with optional WeightedRandomSampler.
+        """
+        if self.use_weighted_sampler:
+            sampler = self.create_weighted_sampler(train_dataset)
+            train_loader = DataLoader(
+                train_dataset, batch_size=self.batch_size, sampler=sampler
             )
-            train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=self.batch_size, sampler=sampler)
         else:
-            train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
-
-        val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False)
-
-        optimizer = self._configure_optimizer()
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=len(train_loader) // 5, gamma=0.7)
-
-        # Training and validation loop
-        self.model = self.model.to(self.device)
-
-        for epoch in range(epochs):
-            # Training loop
-            training_loss = 0
-            training_loop = tqdm(
-                enumerate(train_loader),
-                desc=f"Training Epoch {epoch + 1}/{epochs}",
-                total=len(train_loader),
-                ncols=200
+            train_loader = DataLoader(
+                train_dataset, batch_size=self.batch_size, shuffle=True
             )
-            for train_iteration, batch in training_loop:
+
+        val_loader = DataLoader(
+            val_dataset, batch_size=self.batch_size, shuffle=False
+        )
+        optimizer = self._configure_optimizer()
+        scheduler = torch.optim.lr_scheduler.StepLR(
+            optimizer, step_size=self.num_epochs * len(train_loader) / 5, gamma=0.7
+        )
+        loss_fn = F.cross_entropy
+        if self.class_weights is not None:
+            class_weights_tensor = torch.tensor(self.class_weights).to(self.device)
+            loss_fn = lambda output, target: F.cross_entropy(output, target, weight=class_weights_tensor)
+
+        self.model = self.model.to(self.device)
+        for epoch in range(self.num_epochs):
+            # Training loop
+            for batch in tqdm(train_loader, desc=f"Epoch {epoch + 1}/{self.num_epochs}"):
                 optimizer.zero_grad()
-                loss, _ = self._general_step(batch, loss_fn, class_weights)
+                loss, _ = self._general_step(batch, loss_fn)
                 loss.backward()
                 optimizer.step()
                 scheduler.step()
 
-                training_loss += loss.item()
-                training_loop.set_postfix(train_loss=f"{training_loss / (train_iteration + 1):.6f}")
-
-                tb_logger.add_scalar("train_loss", loss.item(), epoch * len(train_loader) + train_iteration)
-
-            # Validation loop
+            # Validation
+            val_loop = tqdm(
+                enumerate(val_loader),
+                desc=f"Validation Epoch {epoch + 1}/{self.num_epochs}",
+                total=len(train_loader),
+                ncols=200,
+            )
             validation_loss = 0
+            total_correct = 0
             with torch.no_grad():
-                val_loop = tqdm(
-                    enumerate(val_loader),
-                    desc=f"Validation Epoch {epoch + 1}/{epochs}",
-                    total=len(val_loader),
-                    ncols=200
-                )
                 for val_iteration, batch in val_loop:
-                    loss, _ = self._general_step(batch, loss_fn, class_weights)
+                    loss, n_correct = self._validation_step(
+                        batch, loss_fn
+                    )  # You need to implement this function.
                     validation_loss += loss.item()
+                    total_correct += n_correct
 
-                    val_loop.set_postfix(val_loss=f"{validation_loss / (val_iteration + 1):.6f}")
-                    tb_logger.add_scalar("val_loss", validation_loss / (val_iteration + 1), epoch * len(val_loader) + val_iteration)
+                    val_loop.set_postfix(
+                        val_loss="{:.8f}".format(validation_loss / (val_iteration + 1)),
+                    )
+
+                    # Update the tensorboard logger.
+                    tb_logger.add_scalar(
+                        "Loss/val",
+                        validation_loss / (val_iteration + 1),
+                        epoch * len(val_loader) + val_iteration,
+                    )
+
+                if self.save_epoch and epoch % self.save_epoch == 0 and epoch != 0:
+                    save_path = os.path.join(path)
+                    self.save_model(save_path, epoch)
+
+            # This value is for the progress bar of the training loop.
+            validation_loss /= len(val_loader)
+            validation_acc = 100.0 * total_correct / len(val_loader.dataset)
+            tb_logger.add_scalar(
+                "Acc/acc",
+                validation_acc,
+                epoch * len(val_loader) + val_iteration,
+            )
+
 
 class ResNet50OneStage(AbstractOneStageModel):
-
     def __init__(
         self,
         params: dict,
         input_channels: int = 1,
-        num_classes: int = None,
+        num_labels: int = None,
+        use_weighted_sampler: bool = False,
         **kwargs,
     ):
         """
@@ -176,63 +236,21 @@ class ResNet50OneStage(AbstractOneStageModel):
 
         Args:
             params (dict): Dictionary containing the hyperparameters.
-            num_classes (int): Number of classes in the dataset
+            # input_size (np.array): Size of the input image. Shape: [channels, height, width]
+            num_labels (int): Number of classes in the dataset
+            use_weighted_sampler (bool): If True, balances target classes.
         """
         super().__init__(
             params=params,
             **kwargs,
         )
+
+        # Assign use_weighted_sampler as an instance attribute
+        self.use_weighted_sampler = use_weighted_sampler
 
         # Load pretrained model
         # Best available weights (currently alias for IMAGENET1K_V2)
         self.model = torchvision.models.resnet50(weights="IMAGENET1K_V2")
-
-        if input_channels != 3:
-            self.model.conv1 = torch.nn.Conv2d(
-                input_channels,
-                self.model.conv1.out_channels,
-                kernel_size=(3, 3),
-                stride=self.model.conv1.stride,
-                padding=self.model.conv1.padding,
-                bias=False,
-            )
-            torch.nn.init.kaiming_normal_(self.model.conv1.weight, mode='fan_out', nonlinearity='relu')
-            
-        # Replace the output layer
-        self.model.fc = torch.nn.Linear(self.model.fc.in_features, num_classes)
-        print(self.model)
-
-        # Set device
-        self.model.to(self.device)
-
-    def forward(self, x):
-        x = x.to(self.device)
-        return self.model(x)
-
-
-class ResNet18OneStage(AbstractOneStageModel):
-
-    def __init__(
-        self,
-        params: dict,
-        input_channels: int = 1,
-        num_classes: int = None,
-        **kwargs,
-    ):
-        """
-        Initialize the model with the given hyperparameters.
-
-        Args:
-            params (dict): Dictionary containing the hyperparameters.
-            num_classes (int): Number of classes in the dataset
-        """
-        super().__init__(
-            params=params,
-            **kwargs,
-        )
-
-        # Load pretrained model
-        self.model = torchvision.models.resnet18(weights="IMAGENET1K_V1")
 
         # Adapt input size of model to the image channels
         if input_channels != 3:
@@ -246,8 +264,10 @@ class ResNet18OneStage(AbstractOneStageModel):
             )
 
         # Replace the output layer
-        self.model.fc = torch.nn.Linear(self.model.fc.in_features, num_classes)
-        print(self.model)
+        self.model.fc = torch.nn.Linear(
+            self.model.fc.in_features,
+            num_labels,
+        )
 
         # Set device
         self.model.to(self.device)
@@ -255,3 +275,62 @@ class ResNet18OneStage(AbstractOneStageModel):
     def forward(self, x):
         x = x.to(self.device)
         return self.model(x)
+
+    @property
+    def name(self):
+        return "ResNet50OneStage"
+
+
+class ResNet18OneStage(AbstractOneStageModel):
+    def __init__(
+        self,
+        params: dict,
+        input_channels: int = 1,
+        num_labels: int = None,
+        use_weighted_sampler: bool = False,
+        **kwargs,
+    ):
+        """
+        Initialize the model with the given hyperparameters.
+
+        Args:
+            params (dict): Dictionary containing the hyperparameters.
+            # input_size (np.array): Size of the input image. Shape: [channels, height, width]
+            num_labels (int): Number of classes in the dataset
+            use_weighted_sampler (bool): If True, balances target classes.
+        """
+        super().__init__(
+            params=params,
+            **kwargs,
+        )
+
+        # Assign use_weighted_sampler as an instance attribute
+        self.use_weighted_sampler = use_weighted_sampler
+
+        # Load pretrained model
+        self.model = torchvision.models.resnet18(weights="IMAGENET1K_V1:")
+
+        # Adapt input size of model to the image channels
+        if input_channels != 3:
+            self.model.conv1 = torch.nn.Conv2d(
+                input_channels,
+                self.model.conv1.out_channels,
+                kernel_size=self.model.conv1.kernel_size,
+                stride=self.model.conv1.stride,
+                padding=self.model.conv1.padding,
+                bias=False,
+            )
+
+        # Replace the output layer
+        self.model.fc = torch.nn.Linear(self.model.fc.in_features, num_labels)
+
+        # Set device
+        self.model.to(self.device)
+
+    def forward(self, x):
+        x = x.to(self.device)
+        return self.model(x)
+
+    @property
+    def name(self):
+        return "ResNet18OneStage"
