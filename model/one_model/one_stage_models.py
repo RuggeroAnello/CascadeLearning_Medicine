@@ -6,6 +6,13 @@ import torch.nn.functional as F
 
 from tqdm import tqdm
 
+from torcheval.metrics import (
+    BinaryRecall,
+    BinaryPrecision,
+    BinaryF1Score,
+    BinaryAccuracy,
+)
+
 
 class AbstractOneStageModel(torch.nn.Module):
     def __init__(
@@ -38,6 +45,10 @@ class AbstractOneStageModel(torch.nn.Module):
             self.loss_fn = params["loss_fn"]
         if "save_epoch" in params:
             self.save_epoch = params["save_epoch"]
+        if "confidence_threshold" in params:
+            self.confidence_threshold = params["confidence_threshold"]
+        if "metrics" in params:
+            self.metrics = params["metrics"]
         # TODO add more hyperparameters if needed
 
         # Save hyperparameters
@@ -79,7 +90,7 @@ class AbstractOneStageModel(torch.nn.Module):
     def load_hparams(self, path: str):
         self.params = json.load(open(path, "r"))
 
-    def _general_step(self, batch, loss_fn=F.cross_entropy):
+    def _general_step(self, batch, loss_fn=F.cross_entropy, val=False, metrics=[]):
         images, targets = batch
 
         # load X, y to device!
@@ -91,9 +102,17 @@ class AbstractOneStageModel(torch.nn.Module):
         # loss
         loss = loss_fn(out, targets)
 
-        # TODO calculate n_correct
-        n_correct = 0
-        return loss, n_correct
+        if val:
+            # TODO only works for one class labeling yet!
+            # calculate number of correct predictions for one class
+            out = torch.sigmoid(out)
+
+            # TODO intialize the metrics and the threshold from params
+            for metric in metrics:
+                metric.update(out, targets)
+                metric.compute()
+
+        return loss
 
     def _general_end(self, outputs, mode):
         # average over all batches aggregated during one epoch
@@ -105,15 +124,15 @@ class AbstractOneStageModel(torch.nn.Module):
         return avg_loss, acc
 
     def _training_step(self, batch, loss_fn):
-        loss, n_correct = self._general_step(batch, loss_fn=loss_fn)
+        loss = self._general_step(batch, loss_fn=loss_fn)
         return loss
 
-    def _validation_step(self, batch, loss_fn=F.cross_entropy):
-        loss, n_correct = self._general_step(batch, loss_fn=loss_fn)
-        return loss, n_correct
+    def _validation_step(self, batch, loss_fn=F.cross_entropy, metrics=[]):
+        loss = self._general_step(batch, loss_fn=loss_fn, val=True, metrics=metrics)
+        return loss
 
-    def _test_step(self, batch, loss_fn=F.cross_entropy):
-        loss, n_correct = self._general_step(batch, loss_fn=loss_fn)
+    def _test_step(self, batch, loss_fn=F.cross_entropy, metrics=[]):
+        loss = self._general_step(batch, loss_fn=loss_fn, val=True, metrics=metrics)
         return loss
 
     def _configure_optimizer(self, learning_rate=1e-3):
@@ -166,7 +185,7 @@ class AbstractOneStageModel(torch.nn.Module):
 
                 # Update the tensorboard logger.
                 tb_logger.add_scalar(
-                    "Loss/train",
+                    "Train/loss",
                     loss.item(),
                     epoch * len(train_loader) + train_iteration,
                 )
@@ -182,7 +201,7 @@ class AbstractOneStageModel(torch.nn.Module):
             total_correct = 0
             with torch.no_grad():
                 for val_iteration, batch in val_loop:
-                    loss, n_correct = self._validation_step(
+                    loss, n_correct, correct, scores = self._validation_step(
                         batch, loss_fn
                     )  # You need to implement this function.
                     validation_loss += loss.item()
@@ -194,7 +213,7 @@ class AbstractOneStageModel(torch.nn.Module):
 
                     # Update the tensorboard logger.
                     tb_logger.add_scalar(
-                        "Loss/val",
+                        "Val/loss",
                         validation_loss / (val_iteration + 1),
                         epoch * len(val_loader) + val_iteration,
                     )
@@ -205,12 +224,56 @@ class AbstractOneStageModel(torch.nn.Module):
 
             # This value is for the progress bar of the training loop.
             validation_loss /= len(val_loader)
-            validation_acc = 100.0 * total_correct / len(val_loader.dataset)
+            validation_acc = total_correct / len(val_loader.dataset)
+
+            # Calculate Metrics
+            if "accuracy" in self.metrics:
+                tb_logger.add_scalar(
+                    "Val/acc",
+                    validation_acc,
+                    epoch * len(val_loader) + val_iteration,
+                )
+
+    def test(self, test_dataset, tb_logger, path):
+        test_loader = torch.utils.data.DataLoader(
+            test_dataset, batch_size=self.batch_size, shuffle=False
+        )
+        test_loss = 0
+        total_correct = 0
+        results = {}
+        with torch.no_grad():
+            for test_iteration, batch in enumerate(test_loader):
+                (
+                    loss,
+                    n_correct,
+                    scores,
+                ) = self._test_step(batch)
+                test_loss += loss.item()
+                total_correct += n_correct.item()
+
+            test_loss /= len(test_loader)
+        if "accuracy" in self.metrics:
+            test_acc = total_correct / len(test_loader.dataset)
             tb_logger.add_scalar(
-                "Acc/acc",
-                validation_acc,
-                epoch * len(val_loader) + val_iteration,
+                "Test/acc",
+                test_acc,
+                test_iteration,
             )
+            results["accuracy"] = test_acc
+        if "precision" in self.metrics:
+            results["precision"] = 0
+        if "recall" in self.metrics:
+            results["recall"] = 0
+        if "f1" in self.metrics:
+            results["f1"] = 0
+        if "confusion_matrix" in self.metrics:
+            results["confusion_matrix"] = {
+                "TP": 0,
+                "FP": 0,
+                "TN": 0,
+                "FN": 0,
+            }
+        return results
 
 
 class ResNet50OneStage(AbstractOneStageModel):
