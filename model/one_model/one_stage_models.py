@@ -360,8 +360,7 @@ class ResNet18OneStage(AbstractOneStageModel):
             **kwargs,
         )
 
-        # Load pretrained model
-        self.model = torchvision.models.resnet18(weights="IMAGENET1K_V1:")
+        self.model = torchvision.models.resnet18(weights="IMAGENET1K_V1")
 
         # Adapt input size of model to the image channels
         if input_channels != 3:
@@ -375,7 +374,10 @@ class ResNet18OneStage(AbstractOneStageModel):
             )
 
         # Replace the output layer
-        self.model.fc = torch.nn.Linear(self.model.fc.in_features, num_labels)
+        self.model.fc = torch.nn.Linear(
+            self.model.fc.in_features,
+            num_labels,
+        )
 
         # Set device
         self.model.to(self.device)
