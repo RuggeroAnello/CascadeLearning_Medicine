@@ -108,9 +108,9 @@ class AbstractOneStageModel(torch.nn.Module):
             out = torch.sigmoid(out)
 
             # TODO intialize the metrics and the threshold from params
-            for metric in metrics:
-                metric.update(out, targets)
-                metric.compute()
+            # for metric in metrics:
+            # metric.update(out, targets)
+            # metric.compute()
 
         return loss
 
