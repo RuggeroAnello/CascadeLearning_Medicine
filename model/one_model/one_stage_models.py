@@ -5,8 +5,16 @@ import os
 import numpy as np
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, WeightedRandomSampler
-from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_score
+
+from torcheval.metrics import (
+    BinaryRecall,
+    BinaryPrecision,
+    BinaryF1Score,
+    BinaryAccuracy,
+)
+
 from tqdm import tqdm
+
 
 class AbstractOneStageModel(torch.nn.Module):
     def __init__(
@@ -25,12 +33,13 @@ class AbstractOneStageModel(torch.nn.Module):
         super().__init__()
         # Set device
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.labels = None        
+        self.labels = None
         self.unique_labels = None
 
         # Save hyperparameters
         self.params = params
         self._configure_hyperparameters(params)
+        self._configure_metrics(params)
 
         # Save results
         self.results = {}
@@ -41,7 +50,7 @@ class AbstractOneStageModel(torch.nn.Module):
     @property
     def name(self):
         raise NotImplementedError
-    
+
     def _configure_hyperparameters(self, params):
         self.lr = params.get("lr", 1e-3)
         self.batch_size = params.get("batch_size", 32)
@@ -52,20 +61,38 @@ class AbstractOneStageModel(torch.nn.Module):
         loss_fn_mapping = {
             "cross_entropy": torch.nn.CrossEntropyLoss(),
             "mse_loss": torch.nn.MSELoss(),
-            "BCEWithLogitsLoss": torch.nn.BCEWithLogitsLoss()
-        # Add other loss functions here if needed
-    }   # Set the loss function, defaulting to BCEWithLogitsLoss if not specified
+            "BCEWithLogitsLoss": torch.nn.BCEWithLogitsLoss(),
+            # Add other loss functions here if needed
+        }  # Set the loss function, defaulting to BCEWithLogitsLoss if not specified
         self.loss_fn = loss_fn_mapping.get(loss_fn_str, torch.nn.BCEWithLogitsLoss())
-    
+
         self.save_epoch = params.get("save_epoch", 1)
         self.use_weighted_sampler = params.get("use_weighted_sampler", False)
         self.save_epoch = params.get("save_epoch", 1)
         self.use_weighted_sampler = params.get("use_weighted_sampler", False)
-    
+        self.confidence_threshold = params.get("confidence_threshold", 0.5)
+
+    def _configure_metrics(self, params):
+        # TODO: Add more metrics if needed
+        self.val_metrics = {}
+        self.test_metrics = {}
+        # Accuracy is always calculated
+        self.val_metrics["accuracy"] = BinaryAccuracy(self.confidence_threshold)
+        self.test_metrics["accuracy"] = BinaryAccuracy(self.confidence_threshold)
+        if "precision" in params["metrics"]:
+            self.val_metrics["precision"] = BinaryPrecision(self.confidence_threshold)
+            self.test_metrics["precision"] = BinaryPrecision(self.confidence_threshold)
+        if "recall" in params["metrics"]:
+            self.val_metrics["recall"] = BinaryRecall(self.confidence_threshold)
+            self.test_metrics["recall"] = BinaryRecall(self.confidence_threshold)
+        if "f1" in params["metrics"]:
+            self.val_metrics["f1"] = BinaryF1Score(self.confidence_threshold)
+            self.test_metrics["f1"] = BinaryF1Score(self.confidence_threshold)
+
     def set_labels(self, labels):
-        self.labels = labels # Set labels from dataset
+        self.labels = labels  # Set labels from dataset
         self.unique_labels = np.unique(self.labels)
-        print(f"Model labels: {self.unique_labels}")  
+        print(f"Model labels: {self.unique_labels}")
 
     def save_model(self, path: str, epoch: int = None):
         """
@@ -100,43 +127,23 @@ class AbstractOneStageModel(torch.nn.Module):
         class_counts = {l: np.sum(dataset.labels == l) for l in self.unique_labels}
         weights = {l: 1.0 / class_counts[l] for l in self.unique_labels}
         sample_weights = np.array([weights[l] for l in dataset.labels])
-        return WeightedRandomSampler(sample_weights, len(sample_weights), replacement=True)
-        
+        return WeightedRandomSampler(
+            sample_weights, len(sample_weights), replacement=True
+        )
+
     def _prepare_dataloaders(self, train_dataset, val_dataset):
         if self.use_weighted_sampler:
             sampler = self.create_weighted_sampler(train_dataset)
-            train_loader = DataLoader(train_dataset, batch_size=self.batch_size, sampler=sampler)
+            train_loader = DataLoader(
+                train_dataset, batch_size=self.batch_size, sampler=sampler
+            )
         else:
-            train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
+            train_loader = DataLoader(
+                train_dataset, batch_size=self.batch_size, shuffle=True
+            )
 
         val_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False)
         return train_loader, val_loader
-        
-    def _general_step(self, batch, loss_fn=F.cross_entropy):
-        if len(batch) == 0:  # Defensive check for empty batch
-            return 0, 0
-        
-        images, labels = batch 
-        images, labels = images.to(self.device), labels.to(self.device) 
-
-        # Forward pass
-        outputs = self.forward(images)
-        
-        # Compute loss
-        # Ensure loss function matches
-        if labels.dim() > 1:  # For multi-label classification
-            loss = loss_fn(outputs, labels)
-        else:  
-            loss = loss_fn(outputs, labels.long())
-
-        # Compute number of correct predictions
-        preds = outputs.argmax(dim=1)  
-        if labels.dim() > 1:  
-            n_correct = (preds.unsqueeze(1) == labels.nonzero(as_tuple=True)[1]).sum().item()
-        else: 
-            n_correct = (preds == labels).sum().item()
-        
-        return loss, n_correct
 
     def _general_end(self, outputs, mode):
         # average over all batches aggregated during one epoch
@@ -148,30 +155,63 @@ class AbstractOneStageModel(torch.nn.Module):
         return avg_loss, acc
 
     def _training_step(self, batch, loss_fn):
-        loss, _ = self._general_step(batch, loss_fn=loss_fn)
-        return loss
+        """
+        Perform a single training step on the given batch.
 
-    def _validation_step(self, batch, loss_fn=F.cross_entropy):
-        loss, n_correct = self._general_step(batch, loss_fn=loss_fn)
-        return loss, n_correct
+        Args:
+            batch: image, labels
+            loss_fn: loss function to use for training
 
-    def _test_step(self, batch):
+        Returns:
+            loss: loss value for the batch
+        """
+
         images, labels = batch
         images, labels = images.to(self.device), labels.to(self.device)
+
+        # Forward pass
         outputs = self.forward(images)
-        loss = self.loss_fn(outputs, labels)
-        n_correct = (outputs.argmax(dim=1) == labels).sum()
-        return loss, n_correct, outputs  
+
+        # Compute loss
+        loss = loss_fn(outputs, labels)
+
+        return loss
+
+    def _validation_step(
+        self,
+        batch,
+        metrics,
+        loss_fn=F.cross_entropy,
+    ):
+        images, labels = batch
+        images, labels = images.to(self.device), labels.to(self.device)
+
+        # Forward pass
+        outputs = self.forward(images)
+
+        # Compute loss
+        loss = loss_fn(outputs, labels)
+
+        # Activate the outputs to get the predictions
+        outputs = torch.sigmoid(outputs)
+
+        # Update metrics
+        for metric in metrics.values():
+            # TODO (future, don't worry ruggero): doesn't work for multiclass
+            # TODO (now) binary recall doesn't work yet
+            metric.update(outputs.flatten(), labels.flatten())
+
+        return loss
 
     def _configure_optimizer(self):
         if self.optimizer_name.lower() == "sgd":
             return torch.optim.SGD(self.model.parameters(), lr=self.lr)
         return torch.optim.Adam(self.model.parameters(), lr=self.lr)
-    
+
     def train(self, train_dataset, val_dataset, tb_logger, path):
         # Prepare data loaders
         train_loader, val_loader = self._prepare_dataloaders(train_dataset, val_dataset)
-        
+
         optimizer = self._configure_optimizer()
         scheduler = torch.optim.lr_scheduler.StepLR(
             optimizer, step_size=int(len(train_loader) / 5), gamma=0.7
@@ -199,10 +239,16 @@ class AbstractOneStageModel(torch.nn.Module):
                 scheduler.step()
 
                 training_loss += loss.item()
-                train_loop.set_postfix(train_loss=f"{training_loss / (train_iteration + 1):.6f}")
+                train_loop.set_postfix(
+                    train_loss=f"{training_loss / (train_iteration + 1):.6f}"
+                )
 
                 # Log training loss
-                tb_logger.add_scalar("Train/loss", loss.item(), epoch * len(train_loader) + train_iteration)
+                tb_logger.add_scalar(
+                    "Train/loss",
+                    loss.item(),
+                    epoch * len(train_loader) + train_iteration,
+                )
 
             # Validation
             self.model.eval()
@@ -212,119 +258,68 @@ class AbstractOneStageModel(torch.nn.Module):
                 total=len(val_loader),
                 ncols=200,
             )
+
             validation_loss = 0
-            total_correct = 0
-            all_labels = []
-            all_preds = []
 
             with torch.no_grad():
                 with torch.no_grad():
                     for val_iteration, batch in enumerate(val_loop):
-                        loss, n_correct = self._validation_step(batch, loss_fn)
+                        loss = self._validation_step(batch, self.val_metrics, loss_fn)
                         validation_loss += loss.item()
-                        total_correct += n_correct
-
-                        # Collect labels and predictions for metrics
-                        images, labels = batch
-                        labels = labels.to(self.device)
-                        outputs = self.forward(images.to(self.device))
-                        preds = outputs.argmax(dim=1)
-
-                        all_labels.append(labels.cpu())
-                        all_preds.append(preds.cpu())
-
-                        # Running accuracy
-                        running_accuracy = total_correct / ((val_iteration + 1) * val_loader.batch_size)
 
                         # Update progress bar
                         val_loop.set_postfix(
                             val_loss=f"{validation_loss / (val_iteration + 1):.6f}",
-                            val_acc=f"{running_accuracy:.4f}",
-        )
-
-                    # Log validation loss
-                    tb_logger.add_scalar("Val/loss", loss.item(), epoch * len(val_loader) + val_iteration)
+                        )
 
             # Validation metrics computation and logging
             validation_loss /= len(val_loader)  # Average validation loss
-            validation_acc = total_correct / len(val_loader.dataset)  # Accuracy
 
-            # Concatenate all labels and predictions
-            all_labels = torch.cat(all_labels)
-            all_preds = torch.cat(all_preds)
-
-            # Compute additional metrics
-            metrics = {
-                "accuracy": validation_acc
-            }
-
-            if "precision" in self.params:  # Check if metric is configured
-                metrics["precision"] = precision_score(all_labels, all_preds, average="weighted")
-            if "recall" in self.params:
-                metrics["recall"] = recall_score(all_labels, all_preds, average="weighted")
-            if "f1" in self.params:
-                metrics["f1"] = f1_score(all_labels, all_preds, average="weighted")
-            if "roc_auc" in self.params and len(self.unique_labels) == 2:  # Binary classification
-                probabilities = F.softmax(outputs, dim=1)[:, 1]  # Use probabilities for AUC
-                metrics["roc_auc"] = roc_auc_score(all_labels, probabilities)
-
-            # Log validation metrics to TensorBoard
             tb_logger.add_scalar("Val/loss", validation_loss, epoch)
-            tb_logger.add_scalar("Val/accuracy", validation_acc, epoch)
 
-            for metric_name, metric_value in metrics.items():
-                tb_logger.add_scalar(f"Val/{metric_name}", metric_value, epoch)
+            for metric_name, metric_value in self.val_metrics.items():
+                tb_logger.add_scalar(
+                    f"Val/{metric_name}", metric_value.compute(), epoch
+                )
 
             # Save model at specified intervals
             if self.save_epoch and (epoch + 1) % self.save_epoch == 0:
                 self.save_model(path, epoch + 1)
 
-    def test(self, test_dataset, tb_logger, path):
-        test_loader = DataLoader(test_dataset, batch_size=self.batch_size, shuffle=False)
-        test_loss = 0
-        total_correct = 0
-        all_labels = []
-        all_preds = []
+        for metric_name, metric_value in self.val_metrics.items():
+            metric_value.reset()
+
+    def test(self, test_dataset, tb_logger):
+        test_loader = DataLoader(
+            test_dataset, batch_size=self.batch_size, shuffle=False
+        )
 
         self.model.eval()
+        test_loop = tqdm(
+            test_loader,
+            desc="Testing",
+            total=len(test_loader),
+            ncols=200,
+        )
+
+        test_loss = 0
+
         with torch.no_grad():
-            for _, batch in enumerate(tqdm(test_loader, desc="Testing", ncols=200)):
-                loss, n_correct, outputs = self._test_step(batch)
+            for test_iteration, batch in enumerate(test_loop):
+                loss = self._validation_step(
+                    batch,
+                    self.test_metrics,
+                    self.loss_fn,
+                )
                 test_loss += loss.item()
-                total_correct += n_correct.item()
 
-                # Store labels and predictions for metric calculations
-                _, labels = batch
-                labels = labels.to(self.device)
-                preds = outputs.argmax(dim=1)
-                all_labels.append(labels.cpu())
-                all_preds.append(preds.cpu())
+                # Update progress bar
+                test_loop.set_postfix(
+                    test_loss=f"{test_loss / (test_iteration + 1):.6f}",
+                )
 
-        # Calculate average loss and accuracy
-        test_loss /= len(test_loader)
-        test_acc = total_correct / len(test_loader.dataset)
-
-        # Concatenate all labels and predictions
-        all_labels = torch.cat(all_labels)
-        all_preds = torch.cat(all_preds)
-
-        # Calculate metrics
-        metrics = {}
-        metrics["accuracy"] = test_acc
-        if "precision" in self.params:
-            metrics["precision"] = precision_score(all_labels, all_preds, average="weighted")
-        if "recall" in self.params:
-            metrics["recall"] = recall_score(all_labels, all_preds, average="weighted")
-        if "f1" in self.params:
-            metrics["f1"] = f1_score(all_labels, all_preds, average="weighted")
-        if "roc_auc" in self.params and len(self.unique_labels) == 2:  # ROC AUC only for binary classification
-            metrics["roc_auc"] = roc_auc_score(all_labels, F.softmax(outputs, dim=1)[:, 1])
-
-        # Log results
-        for key, value in metrics.items():
-            tb_logger.add_scalar(f"Test/{key}", value)
-
-        return metrics
+        # TODO Test metrics computation and logging
+        # Analogous to validation metrics just use self.test_metrics
 
 
 class ResNet50OneStage(AbstractOneStageModel):
@@ -403,7 +398,57 @@ class ResNet18OneStage(AbstractOneStageModel):
         )
 
         # Load pretrained model
-        self.model = torchvision.models.resnet18(weights="IMAGENET1K_V1:")
+        self.model = torchvision.models.resnet18(weights="IMAGENET1K_V1")
+
+        # Adapt input size of model to the image channels
+        if input_channels != 3:
+            self.model.conv1 = torch.nn.Conv2d(
+                input_channels,
+                self.model.conv1.out_channels,
+                kernel_size=self.model.conv1.kernel_size,
+                stride=self.model.conv1.stride,
+                padding=self.model.conv1.padding,
+                bias=False,
+            )
+
+        # Replace the output layer
+        self.model.fc = torch.nn.Linear(self.model.fc.in_features, num_labels)
+
+        # Set device
+        self.model.to(self.device)
+
+    def forward(self, x):
+        x = x.to(self.device)
+        return self.model(x)
+
+    @property
+    def name(self):
+        return "ResNet18OneStage"
+
+
+class ResNet34OneStage(AbstractOneStageModel):
+    def __init__(
+        self,
+        params: dict,
+        input_channels: int = 1,
+        num_labels: int = None,
+        **kwargs,
+    ):
+        """
+        Initialize the model with the given hyperparameters.
+
+        Args:
+            params (dict): Dictionary containing the hyperparameters.
+            # input_size (np.array): Size of the input image. Shape: [channels, height, width]
+            num_labels (int): Number of classes in the dataset
+        """
+        super().__init__(
+            params=params,
+            **kwargs,
+        )
+
+        # Load pretrained model
+        self.model = torchvision.models.resnet34(weights="IMAGENET1K_V1")
 
         # Adapt input size of model to the image channels
         if input_channels != 3:
