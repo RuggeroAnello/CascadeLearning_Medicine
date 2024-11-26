@@ -106,11 +106,14 @@ class AbstractOneStageModel(torch.nn.Module):
             # TODO only works for one class labeling yet!
             # calculate number of correct predictions for one class
             out = torch.sigmoid(out)
+            correct = (out > self.confidence_threshold) == targets
+            n_correct = correct.sum()
 
             # TODO intialize the metrics and the threshold from params
             # for metric in metrics:
             # metric.update(out, targets)
             # metric.compute()
+            return loss, n_correct
 
         return loss
 
@@ -128,12 +131,16 @@ class AbstractOneStageModel(torch.nn.Module):
         return loss
 
     def _validation_step(self, batch, loss_fn=F.cross_entropy, metrics=[]):
-        loss = self._general_step(batch, loss_fn=loss_fn, val=True, metrics=metrics)
-        return loss
+        loss, n_correct = self._general_step(
+            batch, loss_fn=loss_fn, val=True, metrics=metrics
+        )
+        return loss, n_correct
 
     def _test_step(self, batch, loss_fn=F.cross_entropy, metrics=[]):
-        loss = self._general_step(batch, loss_fn=loss_fn, val=True, metrics=metrics)
-        return loss
+        loss, n_correct = self._general_step(
+            batch, loss_fn=loss_fn, val=True, metrics=metrics
+        )
+        return loss, n_correct
 
     def _configure_optimizer(self, learning_rate=1e-3):
         if self.optimizer == "adam":
@@ -201,7 +208,7 @@ class AbstractOneStageModel(torch.nn.Module):
             total_correct = 0
             with torch.no_grad():
                 for val_iteration, batch in val_loop:
-                    loss, n_correct, correct, scores = self._validation_step(
+                    loss, n_correct = self._validation_step(
                         batch, loss_fn
                     )  # You need to implement this function.
                     validation_loss += loss.item()
@@ -233,8 +240,10 @@ class AbstractOneStageModel(torch.nn.Module):
                     validation_acc,
                     epoch * len(val_loader) + val_iteration,
                 )
+                # TODO: other metrics like precision, recall, f1, confusion matrix but load from self.matrics array with torcheval metrics
 
     def test(self, test_dataset, tb_logger, path):
+        # TODO
         test_loader = torch.utils.data.DataLoader(
             test_dataset, batch_size=self.batch_size, shuffle=False
         )
