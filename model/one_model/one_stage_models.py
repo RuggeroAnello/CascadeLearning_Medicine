@@ -361,7 +361,7 @@ class ResNet18OneStage(AbstractOneStageModel):
         )
 
         # Load pretrained model
-        self.model = torchvision.models.resnet18(weights="IMAGENET1K_V1:")
+        self.model = torchvision.models.resnet18(weights="IMAGENET1K_V1")
 
         # Adapt input size of model to the image channels
         if input_channels != 3:
