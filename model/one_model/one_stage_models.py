@@ -199,9 +199,7 @@ class AbstractOneStageModel(torch.nn.Module):
             # TODO (for the future): doesn't work for multiclass
             # TODO (now) binary recall doesn't work yet [Done]
             predictions = (outputs > self.confidence_threshold).long()
-            metric.update(predictions, labels.squeeze().long())  # Ensure labels are 1D 
-            # Avoid RuntimeError: "bitwise_and_cpu" not implemented for 'Double'
-    
+            metric.update(predictions, labels.squeeze().long())  # Ensure labels are 1D
 
         return loss
 
