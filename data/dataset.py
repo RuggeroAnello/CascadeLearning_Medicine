@@ -41,7 +41,7 @@ class CheXpertDataset(Dataset):
         target_columns = [self.data.columns[i] for i in self.targets.values()]
 
         ''' !!! TO-DO!
-        For the moment I'm not dealing with '-1' labels, just removing them to see if everything else work. 
+        For the moment not dealing with '-1' labels, just removing them to see if everything else work. 
             !!! TO-DO!
         '''
         self.data = self.data[self.data[target_columns].apply(lambda row: (row != -1.0).all(), axis=1)]
@@ -72,11 +72,5 @@ class CheXpertDataset(Dataset):
         for i, key in enumerate(self.targets.values()):
             samples[i] = self.data.iloc[idx, key]
 
-<<<<<<< HEAD
-        # if only one sample cahnge shape to [1,1] instead of [1]
-
-        return img, samples
-=======
         # Ensure the labels are a 1D array
         return img, samples
->>>>>>> development_ruggero

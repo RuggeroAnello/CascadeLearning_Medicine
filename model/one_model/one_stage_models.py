@@ -1,4 +1,3 @@
-import json
 import torch
 import json
 import torchvision
@@ -15,13 +14,6 @@ from torcheval.metrics import (
 )
 
 from tqdm import tqdm
-
-from torcheval.metrics import (
-    BinaryRecall,
-    BinaryPrecision,
-    BinaryF1Score,
-    BinaryAccuracy,
-)
 
 
 class AbstractOneStageModel(torch.nn.Module):
@@ -44,37 +36,10 @@ class AbstractOneStageModel(torch.nn.Module):
         self.labels = None
         self.unique_labels = None
 
-<<<<<<< HEAD
-        # Set hyperparameters
-        if "lr" in params:
-            self.lr = params["lr"]
-        if "batch_size" in params:
-            self.batch_size = params["batch_size"]
-        if "num_epochs" in params:
-            self.num_epochs = params["num_epochs"]
-        if "optimizer" in params:
-            self.optimizer = params["optimizer"]
-        if "loss_fn" in params:
-            self.loss_fn = params["loss_fn"]
-        if "save_epoch" in params:
-            self.save_epoch = params["save_epoch"]
-        if "confidence_threshold" in params:
-            self.confidence_threshold = params["confidence_threshold"]
-        if "metrics" in params:
-            self.metrics = params["metrics"]
-        # TODO add more hyperparameters if needed
-=======
         # Save hyperparameters
         self.params = params
         self._configure_hyperparameters(params)
         self._configure_metrics(params)
-
-        # Save results
-        self.results = {}
->>>>>>> development_ruggero
-
-        # Save hyperparameters
-        self.params = params
 
         # Save results
         self.results = {}
@@ -86,8 +51,6 @@ class AbstractOneStageModel(torch.nn.Module):
     def name(self):
         raise NotImplementedError
 
-<<<<<<< HEAD
-=======
     def _configure_hyperparameters(self, params):
         self.lr = params.get("lr", 1e-3)
         self.batch_size = params.get("batch_size", 32)
@@ -135,7 +98,6 @@ class AbstractOneStageModel(torch.nn.Module):
         self.unique_labels = np.unique(self.labels)
         print(f"Model labels: {self.unique_labels}")
 
->>>>>>> development_ruggero
     def save_model(self, path: str, epoch: int = None):
         """
         Save the model and its weights to the given path.
@@ -161,12 +123,6 @@ class AbstractOneStageModel(torch.nn.Module):
 
     def load_hparams(self, path: str):
         self.params = json.load(open(path, "r"))
-<<<<<<< HEAD
-
-    def _general_step(self, batch, loss_fn=F.cross_entropy, val=False, metrics=[]):
-        images, targets = batch
-=======
->>>>>>> development_ruggero
 
     def create_weighted_sampler(self, dataset):
         """
@@ -190,28 +146,8 @@ class AbstractOneStageModel(torch.nn.Module):
                 train_dataset, batch_size=self.batch_size, shuffle=True
             )
 
-<<<<<<< HEAD
-        # loss
-        loss = loss_fn(out, targets)
-
-        if val:
-            # TODO only works for one class labeling yet!
-            # calculate number of correct predictions for one class
-            out = torch.sigmoid(out)
-            correct = (out > self.confidence_threshold) == targets
-            n_correct = correct.sum()
-
-            # TODO intialize the metrics and the threshold from params
-            # for metric in metrics:
-            # metric.update(out, targets)
-            # metric.compute()
-            return loss, n_correct
-
-        return loss
-=======
         val_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False)
         return train_loader, val_loader
->>>>>>> development_ruggero
 
     def _general_end(self, outputs, mode):
         # average over all batches aggregated during one epoch
@@ -223,52 +159,6 @@ class AbstractOneStageModel(torch.nn.Module):
         return avg_loss, acc
 
     def _training_step(self, batch, loss_fn):
-<<<<<<< HEAD
-        loss = self._general_step(batch, loss_fn=loss_fn)
-        return loss
-
-    def _validation_step(self, batch, loss_fn=F.cross_entropy, metrics=[]):
-        loss, n_correct = self._general_step(
-            batch, loss_fn=loss_fn, val=True, metrics=metrics
-        )
-        return loss, n_correct
-
-    def _test_step(self, batch, loss_fn=F.cross_entropy, metrics=[]):
-        loss, n_correct = self._general_step(
-            batch, loss_fn=loss_fn, val=True, metrics=metrics
-        )
-        return loss, n_correct
-
-    def _configure_optimizer(self, learning_rate=1e-3):
-        if self.optimizer == "adam":
-            optim = torch.optim.Adam(self.parameters(), learning_rate)
-        else:
-            optim = torch.optim.Adam(self.parameters(), learning_rate)
-        return optim
-
-    def train(self, train_dataset, val_dataset, tb_logger, path):
-        # Create data loaders
-        train_loader = torch.utils.data.DataLoader(
-            train_dataset, batch_size=self.batch_size, shuffle=True
-        )
-        val_loader = torch.utils.data.DataLoader(
-            val_dataset, batch_size=self.batch_size, shuffle=False
-        )
-        optimizer = self._configure_optimizer()
-        scheduler = torch.optim.lr_scheduler.StepLR(
-            optimizer, step_size=self.num_epochs * len(train_loader) / 5, gamma=0.7
-        )
-        validation_loss = 0
-        # Configure loss function
-        if self.loss_fn == "torch.nn.BCEWithLogitsLoss()":
-            loss_fn = torch.nn.BCEWithLogitsLoss()
-
-        self.model = self.model.to(self.device)
-        for epoch in range(self.num_epochs):
-            # Train
-            training_loop = tqdm(
-                enumerate(train_loader),
-=======
         """
         Perform a single training step on the given batch.
 
@@ -309,9 +199,7 @@ class AbstractOneStageModel(torch.nn.Module):
             # TODO (for the future): doesn't work for multiclass
             # TODO (now) binary recall doesn't work yet [Done]
             predictions = (outputs > self.confidence_threshold).long()
-            metric.update(predictions, labels.squeeze().long())  # Ensure labels are 1D 
-            # Avoid RuntimeError: "bitwise_and_cpu" not implemented for 'Double'
-    
+            metric.update(predictions, labels.squeeze().long())  # Ensure labels are 1D
 
         return loss
 
@@ -337,7 +225,6 @@ class AbstractOneStageModel(torch.nn.Module):
             self.model.train()
             train_loop = tqdm(
                 train_loader,
->>>>>>> development_ruggero
                 desc=f"Training Epoch {epoch + 1}/{self.num_epochs}",
                 total=len(train_loader),
                 ncols=200,
@@ -351,15 +238,8 @@ class AbstractOneStageModel(torch.nn.Module):
                 optimizer.step()
 
                 training_loss += loss.item()
-<<<<<<< HEAD
-
-                # Update the progress bar.
-                training_loop.set_postfix(
-                    train_loss="{:.8f}".format(training_loss / (train_iteration + 1)),
-=======
                 train_loop.set_postfix(
                     train_loss=f"{training_loss / (train_iteration + 1):.6f}"
->>>>>>> development_ruggero
                 )
 
                 # Log training loss
@@ -380,14 +260,6 @@ class AbstractOneStageModel(torch.nn.Module):
             )
 
             validation_loss = 0
-<<<<<<< HEAD
-            total_correct = 0
-            with torch.no_grad():
-                for val_iteration, batch in val_loop:
-                    loss, n_correct = self._validation_step(
-                        batch, loss_fn
-                    )  # You need to implement this function.
-=======
 
             with torch.no_grad():
                 # Reset metrics before loop
@@ -395,81 +267,8 @@ class AbstractOneStageModel(torch.nn.Module):
                     metric.reset()
                 for val_iteration, batch in enumerate(val_loop):
                     loss = self._validation_step(batch, self.val_metrics, loss_fn)
->>>>>>> development_ruggero
                     validation_loss += loss.item()
-                    total_correct += n_correct.item()
 
-<<<<<<< HEAD
-                    val_loop.set_postfix(
-                        val_loss="{:.8f}".format(validation_loss / (val_iteration + 1)),
-                    )
-
-                    # Update the tensorboard logger.
-                    tb_logger.add_scalar(
-                        "Val/loss",
-                        validation_loss / (val_iteration + 1),
-                        epoch * len(val_loader) + val_iteration,
-                    )
-
-                if self.save_epoch and epoch % self.save_epoch == 0 and epoch != 0:
-                    save_path = os.path.join(path)
-                    self.save_model(save_path, epoch)
-
-            # This value is for the progress bar of the training loop.
-            validation_loss /= len(val_loader)
-            validation_acc = total_correct / len(val_loader.dataset)
-
-            # Calculate Metrics
-            if "accuracy" in self.metrics:
-                tb_logger.add_scalar(
-                    "Val/acc",
-                    validation_acc,
-                    epoch * len(val_loader) + val_iteration,
-                )
-                # TODO: other metrics like precision, recall, f1, confusion matrix but load from self.matrics array with torcheval metrics
-
-    def test(self, test_dataset, tb_logger, path):
-        # TODO
-        test_loader = torch.utils.data.DataLoader(
-            test_dataset, batch_size=self.batch_size, shuffle=False
-        )
-        test_loss = 0
-        total_correct = 0
-        results = {}
-        with torch.no_grad():
-            for test_iteration, batch in enumerate(test_loader):
-                (
-                    loss,
-                    n_correct,
-                    scores,
-                ) = self._test_step(batch)
-                test_loss += loss.item()
-                total_correct += n_correct.item()
-
-            test_loss /= len(test_loader)
-        if "accuracy" in self.metrics:
-            test_acc = total_correct / len(test_loader.dataset)
-            tb_logger.add_scalar(
-                "Test/acc",
-                test_acc,
-                test_iteration,
-            )
-            results["accuracy"] = test_acc
-        if "precision" in self.metrics:
-            results["precision"] = 0
-        if "recall" in self.metrics:
-            results["recall"] = 0
-        if "f1" in self.metrics:
-            results["f1"] = 0
-        if "confusion_matrix" in self.metrics:
-            results["confusion_matrix"] = {
-                "TP": 0,
-                "FP": 0,
-                "TN": 0,
-                "FN": 0,
-            }
-        return results
-=======
                     # Update progress bar
                     val_loop.set_postfix(
                         val_loss=f"{validation_loss / (val_iteration + 1):.6f}",
@@ -541,7 +340,6 @@ class AbstractOneStageModel(torch.nn.Module):
 
             # TODO Test metrics computation and logging: Done 
             # Analogous to validation metrics just use self.test_metrics: Done
->>>>>>> development_ruggero
 
 
 class ResNet50OneStage(AbstractOneStageModel):
@@ -621,11 +419,7 @@ class ResNet18OneStage(AbstractOneStageModel):
         )
 
         # Load pretrained model
-<<<<<<< HEAD
-        self.model = torchvision.models.resnet18(weights="IMAGENET1K_V1")
-=======
         self.model = torchvision.models.resnet18(weights="IMAGENET1K_V1").to(self.device)
->>>>>>> development_ruggero
 
         # Adapt input size of model to the image channels
         if input_channels != 3:
@@ -652,8 +446,6 @@ class ResNet18OneStage(AbstractOneStageModel):
     @property
     def name(self):
         return "ResNet18OneStage"
-<<<<<<< HEAD
-=======
 
 
 class ResNet34OneStage(AbstractOneStageModel):
@@ -705,4 +497,3 @@ class ResNet34OneStage(AbstractOneStageModel):
     @property
     def name(self):
         return "ResNet18OneStage"
->>>>>>> development_ruggero
