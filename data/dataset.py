@@ -47,18 +47,17 @@ class CheXpertDataset(Dataset):
         self.data = self.data[self.data[target_columns].apply(lambda row: (row != -1.0).all(), axis=1)]
 
         # Extract labels
-        self.labels = self.data[target_columns].values.astype(int).flatten()
+        self.labels = self.data[target_columns].values.ravel().astype(int)
 
         # Find unique labels
         self.unique_labels = np.unique(self.labels)
 
-        print(f"Labels trovate: {self.unique_labels}")  # Debugging
+        print(f"Labels found: {self.unique_labels}")  # Debugging
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
-
         # Load image
         img_path = os.path.join(self.root_dir, self.data.iloc[idx, 0])
 
@@ -73,4 +72,5 @@ class CheXpertDataset(Dataset):
         for i, key in enumerate(self.targets.values()):
             samples[i] = self.data.iloc[idx, key]
 
+        # Ensure the labels are a 1D array
         return img, samples
