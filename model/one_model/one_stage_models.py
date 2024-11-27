@@ -1,17 +1,19 @@
-import json
 import torch
+import json
 import torchvision
 import os
+import numpy as np
 import torch.nn.functional as F
-
-from tqdm import tqdm
-
+from torch.utils.data import DataLoader, WeightedRandomSampler
 from torcheval.metrics import (
     BinaryRecall,
     BinaryPrecision,
     BinaryF1Score,
     BinaryAccuracy,
+    BinaryAUROC
 )
+
+from tqdm import tqdm
 
 
 class AbstractOneStageModel(torch.nn.Module):
@@ -31,28 +33,13 @@ class AbstractOneStageModel(torch.nn.Module):
         super().__init__()
         # Set device
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-        # Set hyperparameters
-        if "lr" in params:
-            self.lr = params["lr"]
-        if "batch_size" in params:
-            self.batch_size = params["batch_size"]
-        if "num_epochs" in params:
-            self.num_epochs = params["num_epochs"]
-        if "optimizer" in params:
-            self.optimizer = params["optimizer"]
-        if "loss_fn" in params:
-            self.loss_fn = params["loss_fn"]
-        if "save_epoch" in params:
-            self.save_epoch = params["save_epoch"]
-        if "confidence_threshold" in params:
-            self.confidence_threshold = params["confidence_threshold"]
-        if "metrics" in params:
-            self.metrics = params["metrics"]
-        # TODO add more hyperparameters if needed
+        self.labels = None
+        self.unique_labels = None
 
         # Save hyperparameters
         self.params = params
+        self._configure_hyperparameters(params)
+        self._configure_metrics(params)
 
         # Save results
         self.results = {}
@@ -63,6 +50,53 @@ class AbstractOneStageModel(torch.nn.Module):
     @property
     def name(self):
         raise NotImplementedError
+
+    def _configure_hyperparameters(self, params):
+        self.lr = params.get("lr", 1e-3)
+        self.batch_size = params.get("batch_size", 32)
+        self.num_epochs = params.get("num_epochs", 10)
+        self.optimizer_name = params.get("optimizer", "adam")
+        # Map string loss function names to actual loss function classes
+        loss_fn_str = params.get("loss_fn", "BCEWithLogitsLoss")
+        loss_fn_mapping = {
+            "cross_entropy": torch.nn.CrossEntropyLoss(),
+            "mse_loss": torch.nn.MSELoss(),
+            "BCEWithLogitsLoss": torch.nn.BCEWithLogitsLoss(),
+            # Add other loss functions here if needed
+        }  # Set the loss function, defaulting to BCEWithLogitsLoss if not specified
+        self.loss_fn = loss_fn_mapping.get(loss_fn_str, torch.nn.BCEWithLogitsLoss())
+        self.use_weighted_sampler = params.get("use_weighted_sampler", False)
+        self.save_epoch = params.get("save_epoch", 1)
+        self.confidence_threshold = params.get("confidence_threshold", 0.5)
+
+    def _configure_metrics(self, params):
+        # TODO: Add more metrics if needed 
+        self.val_metrics = {}
+        self.test_metrics = {}
+
+        metrics = params.get("metrics", [])
+
+        # Accuracy is always calculated
+        self.val_metrics["accuracy"] = BinaryAccuracy() # These do NOT accept the confidence_threshold as argument -> done in validation_step
+        self.test_metrics["accuracy"] = BinaryAccuracy()
+
+        if "precision" in metrics:
+            self.val_metrics["precision"] = BinaryPrecision()
+            self.test_metrics["precision"] = BinaryPrecision()
+        if "recall" in metrics:
+            self.val_metrics["recall"] = BinaryRecall()
+            self.test_metrics["recall"] = BinaryRecall()
+        if "f1" in metrics:
+            self.val_metrics["f1"] = BinaryF1Score()
+            self.test_metrics["f1"] = BinaryF1Score()
+        if "auc" in metrics:
+            self.val_metrics["auc"] = BinaryAUROC()
+            self.test_metrics["auc"] = BinaryAUROC()
+
+    def set_labels(self, labels):
+        self.labels = labels  # Set labels from dataset
+        self.unique_labels = np.unique(self.labels)
+        print(f"Model labels: {self.unique_labels}")
 
     def save_model(self, path: str, epoch: int = None):
         """
@@ -90,32 +124,30 @@ class AbstractOneStageModel(torch.nn.Module):
     def load_hparams(self, path: str):
         self.params = json.load(open(path, "r"))
 
-    def _general_step(self, batch, loss_fn=F.cross_entropy, val=False, metrics=[]):
-        images, targets = batch
+    def create_weighted_sampler(self, dataset):
+        """
+        Create a WeightedRandomSampler for class imbalances
+        """
+        class_counts = {l: np.sum(dataset.labels == l) for l in self.unique_labels}
+        weights = {l: 1.0 / max(class_counts[l], 1) for l in self.unique_labels} 
+        sample_weights = np.array([weights[l] for l in dataset.labels])
+        return WeightedRandomSampler(
+            sample_weights, len(sample_weights), replacement=True
+        )
 
-        # load X, y to device!
-        images, targets = images.to(self.device), targets.to(self.device)
+    def _prepare_dataloaders(self, train_dataset, val_dataset):
+        if self.use_weighted_sampler:
+            sampler = self.create_weighted_sampler(train_dataset)
+            train_loader = DataLoader(
+                train_dataset, batch_size=self.batch_size, sampler=sampler
+            )
+        else:
+            train_loader = DataLoader(
+                train_dataset, batch_size=self.batch_size, shuffle=True
+            )
 
-        # forward pass
-        out = self.forward(images)
-
-        # loss
-        loss = loss_fn(out, targets)
-
-        if val:
-            # TODO only works for one class labeling yet!
-            # calculate number of correct predictions for one class
-            out = torch.sigmoid(out)
-            correct = (out > self.confidence_threshold) == targets
-            n_correct = correct.sum()
-
-            # TODO intialize the metrics and the threshold from params
-            # for metric in metrics:
-            # metric.update(out, targets)
-            # metric.compute()
-            return loss, n_correct
-
-        return loss
+        val_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False)
+        return train_loader, val_loader
 
     def _general_end(self, outputs, mode):
         # average over all batches aggregated during one epoch
@@ -127,162 +159,187 @@ class AbstractOneStageModel(torch.nn.Module):
         return avg_loss, acc
 
     def _training_step(self, batch, loss_fn):
-        loss = self._general_step(batch, loss_fn=loss_fn)
+        """
+        Perform a single training step on the given batch.
+
+        Args:
+            batch: image, labels
+            loss_fn: loss function to use for training
+
+        Returns:
+            loss: loss value for the batch
+        """
+
+        images, labels = batch
+        images, labels = images.to(self.device), labels.to(self.device)
+
+        # Forward pass
+        outputs = self.forward(images)
+
+        # Compute loss
+        loss = loss_fn(outputs, labels)
+
         return loss
 
-    def _validation_step(self, batch, loss_fn=F.cross_entropy, metrics=[]):
-        loss, n_correct = self._general_step(
-            batch, loss_fn=loss_fn, val=True, metrics=metrics
-        )
-        return loss, n_correct
+    def _validation_step(self, batch, metrics, loss_fn):
+        images, labels = batch
+        images, labels = images.to(self.device), labels.to(self.device)
 
-    def _test_step(self, batch, loss_fn=F.cross_entropy, metrics=[]):
-        loss, n_correct = self._general_step(
-            batch, loss_fn=loss_fn, val=True, metrics=metrics
-        )
-        return loss, n_correct
+        # Forward pass
+        outputs = self.forward(images)
 
-    def _configure_optimizer(self, learning_rate=1e-3):
-        if self.optimizer == "adam":
-            optim = torch.optim.Adam(self.parameters(), learning_rate)
-        else:
-            optim = torch.optim.Adam(self.parameters(), learning_rate)
-        return optim
+        # Compute loss
+        loss = loss_fn(outputs, labels)
+
+        # Activate the outputs to get the predictions
+        outputs = torch.sigmoid(outputs).squeeze()
+
+        # Update metrics
+        for metric in metrics.values():
+            # TODO (for the future): doesn't work for multiclass
+            # TODO (now) binary recall doesn't work yet [Done]
+            predictions = (outputs > self.confidence_threshold).long()
+            metric.update(predictions, labels.squeeze().long())  # Ensure labels are 1D
+
+        return loss
+
+    def _configure_optimizer(self):
+        if self.optimizer_name.lower() == "sgd":
+            return torch.optim.SGD(self.model.parameters(), lr=self.lr)
+        return torch.optim.Adam(self.model.parameters(), lr=self.lr)
 
     def train(self, train_dataset, val_dataset, tb_logger, path):
-        # Create data loaders
-        train_loader = torch.utils.data.DataLoader(
-            train_dataset, batch_size=self.batch_size, shuffle=True
-        )
-        val_loader = torch.utils.data.DataLoader(
-            val_dataset, batch_size=self.batch_size, shuffle=False
-        )
+        # Prepare data loaders
+        train_loader, val_loader = self._prepare_dataloaders(train_dataset, val_dataset)
+
         optimizer = self._configure_optimizer()
         scheduler = torch.optim.lr_scheduler.StepLR(
-            optimizer, step_size=self.num_epochs * len(train_loader) / 5, gamma=0.7
+            optimizer, step_size=int(len(train_loader) / 5), gamma=0.7
         )
-        validation_loss = 0
-        # Configure loss function
-        if self.loss_fn == "torch.nn.BCEWithLogitsLoss()":
-            loss_fn = torch.nn.BCEWithLogitsLoss()
+        loss_fn = self.loss_fn  # Use the loss function configured in the model
 
         self.model = self.model.to(self.device)
+
         for epoch in range(self.num_epochs):
-            # Train
-            training_loop = tqdm(
-                enumerate(train_loader),
+            # Training
+            self.model.train()
+            train_loop = tqdm(
+                train_loader,
                 desc=f"Training Epoch {epoch + 1}/{self.num_epochs}",
                 total=len(train_loader),
                 ncols=200,
             )
             training_loss = 0
-            for train_iteration, batch in training_loop:
+
+            for train_iteration, batch in enumerate(train_loop):
                 optimizer.zero_grad()
                 loss = self._training_step(batch, loss_fn)
                 loss.backward()
                 optimizer.step()
-                scheduler.step()
 
                 training_loss += loss.item()
-
-                # Update the progress bar.
-                training_loop.set_postfix(
-                    train_loss="{:.8f}".format(training_loss / (train_iteration + 1)),
+                train_loop.set_postfix(
+                    train_loss=f"{training_loss / (train_iteration + 1):.6f}"
                 )
 
-                # Update the tensorboard logger.
+                # Log training loss
                 tb_logger.add_scalar(
                     "Train/loss",
                     loss.item(),
                     epoch * len(train_loader) + train_iteration,
                 )
+            scheduler.step()
 
             # Validation
+            self.model.eval()
             val_loop = tqdm(
-                enumerate(val_loader),
+                val_loader,
                 desc=f"Validation Epoch {epoch + 1}/{self.num_epochs}",
-                total=len(train_loader),
+                total=len(val_loader),
                 ncols=200,
             )
+
             validation_loss = 0
-            total_correct = 0
+
             with torch.no_grad():
-                for val_iteration, batch in val_loop:
-                    loss, n_correct = self._validation_step(
-                        batch, loss_fn
-                    )  # You need to implement this function.
+                # Reset metrics before loop
+                for metric in self.val_metrics.values():
+                    metric.reset()
+                for val_iteration, batch in enumerate(val_loop):
+                    loss = self._validation_step(batch, self.val_metrics, loss_fn)
                     validation_loss += loss.item()
-                    total_correct += n_correct.item()
 
+                    # Update progress bar
                     val_loop.set_postfix(
-                        val_loss="{:.8f}".format(validation_loss / (val_iteration + 1)),
+                        val_loss=f"{validation_loss / (val_iteration + 1):.6f}",
                     )
 
-                    # Update the tensorboard logger.
-                    tb_logger.add_scalar(
-                        "Val/loss",
-                        validation_loss / (val_iteration + 1),
-                        epoch * len(val_loader) + val_iteration,
-                    )
+            # Validation metrics computation and logging
+            validation_loss /= len(val_loader)  # Average validation loss
 
-                if self.save_epoch and epoch % self.save_epoch == 0 and epoch != 0:
-                    save_path = os.path.join(path)
-                    self.save_model(save_path, epoch)
+            if tb_logger:
+                tb_logger.add_scalar("Val/loss", validation_loss, epoch)
 
-            # This value is for the progress bar of the training loop.
-            validation_loss /= len(val_loader)
-            validation_acc = total_correct / len(val_loader.dataset)
+            for metric_name, metric in self.val_metrics.items():
+                try:
+                    metric_value = metric.compute()
+                except ZeroDivisionError:
+                    metric_value = 0.0  # Handle edge case
+                tb_logger.add_scalar(f"Val/{metric_name}", metric_value, epoch)
+                
 
-            # Calculate Metrics
-            if "accuracy" in self.metrics:
-                tb_logger.add_scalar(
-                    "Val/acc",
-                    validation_acc,
-                    epoch * len(val_loader) + val_iteration,
-                )
-                # TODO: other metrics like precision, recall, f1, confusion matrix but load from self.matrics array with torcheval metrics
+            # Save model at specified intervals
+            if self.save_epoch and (epoch + 1) % self.save_epoch == 0:
+                self.save_model(path, epoch + 1)
 
-    def test(self, test_dataset, tb_logger, path):
-        # TODO
-        test_loader = torch.utils.data.DataLoader(
+    def test(self, test_dataset, tb_logger):
+        test_loader = DataLoader(
             test_dataset, batch_size=self.batch_size, shuffle=False
         )
-        test_loss = 0
-        total_correct = 0
-        results = {}
-        with torch.no_grad():
-            for test_iteration, batch in enumerate(test_loader):
-                (
-                    loss,
-                    n_correct,
-                    scores,
-                ) = self._test_step(batch)
-                test_loss += loss.item()
-                total_correct += n_correct.item()
 
-            test_loss /= len(test_loader)
-        if "accuracy" in self.metrics:
-            test_acc = total_correct / len(test_loader.dataset)
-            tb_logger.add_scalar(
-                "Test/acc",
-                test_acc,
-                test_iteration,
-            )
-            results["accuracy"] = test_acc
-        if "precision" in self.metrics:
-            results["precision"] = 0
-        if "recall" in self.metrics:
-            results["recall"] = 0
-        if "f1" in self.metrics:
-            results["f1"] = 0
-        if "confusion_matrix" in self.metrics:
-            results["confusion_matrix"] = {
-                "TP": 0,
-                "FP": 0,
-                "TN": 0,
-                "FN": 0,
-            }
-        return results
+        self.model.eval()
+        test_loop = tqdm(
+            test_loader,
+            desc="Testing",
+            total=len(test_loader),
+            ncols=200,
+        )
+
+        test_loss = 0
+
+        with torch.no_grad():
+            for metric in self.test_metrics.values():
+                metric.reset()  
+            for test_iteration, batch in enumerate(test_loop):
+                # Perform the test step and accumulate the loss
+                loss = self._validation_step(
+                    batch,
+                    self.test_metrics,
+                    self.loss_fn,
+                )
+                test_loss += loss.item()
+
+                # Update progress bar
+                test_loop.set_postfix(
+                    test_loss=f"{test_loss / (test_iteration + 1):.6f}",
+                )
+
+        # Average test loss over the entire dataset
+        test_loss /= len(test_loader)
+
+        if tb_logger:
+            tb_logger.add_scalar("Test/loss", test_loss)  # Log test loss
+
+        # Compute and log test metrics
+        for metric_name, metric in self.test_metrics.items():
+            try:
+                metric_value = metric.compute()
+            except ZeroDivisionError:
+                metric_value = 0.0  # Handle edge case
+            tb_logger.add_scalar(f"Test/{metric_name}", metric_value)  # Log metrics
+
+            # TODO Test metrics computation and logging: Done 
+            # Analogous to validation metrics just use self.test_metrics: Done
 
 
 class ResNet50OneStage(AbstractOneStageModel):
@@ -308,7 +365,7 @@ class ResNet50OneStage(AbstractOneStageModel):
 
         # Load pretrained model
         # Best available weights (currently alias for IMAGENET1K_V2)
-        self.model = torchvision.models.resnet50(weights="IMAGENET1K_V2")
+        self.model = torchvision.models.resnet50(weights="IMAGENET1K_V2").to(self.device)
 
         # Adapt input size of model to the image channels
         if input_channels != 3:
@@ -331,7 +388,8 @@ class ResNet50OneStage(AbstractOneStageModel):
         self.model.to(self.device)
 
     def forward(self, x):
-        x = x.to(self.device)
+        self.model = self.model.to(self.device)  # Ensure the entire model is on the correct device
+        x = x.to(self.device)  
         return self.model(x)
 
     @property
@@ -361,7 +419,7 @@ class ResNet18OneStage(AbstractOneStageModel):
         )
 
         # Load pretrained model
-        self.model = torchvision.models.resnet18(weights="IMAGENET1K_V1:")
+        self.model = torchvision.models.resnet18(weights="IMAGENET1K_V1").to(self.device)
 
         # Adapt input size of model to the image channels
         if input_channels != 3:
@@ -381,6 +439,58 @@ class ResNet18OneStage(AbstractOneStageModel):
         self.model.to(self.device)
 
     def forward(self, x):
+        self.model = self.model.to(self.device)  # Ensure the entire model is on the correct device
+        x = x.to(self.device)
+        return self.model(x)
+
+    @property
+    def name(self):
+        return "ResNet18OneStage"
+
+
+class ResNet34OneStage(AbstractOneStageModel):
+    def __init__(
+        self,
+        params: dict,
+        input_channels: int = 1,
+        num_labels: int = None,
+        **kwargs,
+    ):
+        """
+        Initialize the model with the given hyperparameters.
+
+        Args:
+            params (dict): Dictionary containing the hyperparameters.
+            # input_size (np.array): Size of the input image. Shape: [channels, height, width]
+            num_labels (int): Number of classes in the dataset
+        """
+        super().__init__(
+            params=params,
+            **kwargs,
+        )
+
+        # Load pretrained model
+        self.model = torchvision.models.resnet34(weights="IMAGENET1K_V1").to(self.device)
+
+        # Adapt input size of model to the image channels
+        if input_channels != 3:
+            self.model.conv1 = torch.nn.Conv2d(
+                input_channels,
+                self.model.conv1.out_channels,
+                kernel_size=self.model.conv1.kernel_size,
+                stride=self.model.conv1.stride,
+                padding=self.model.conv1.padding,
+                bias=False,
+            )
+
+        # Replace the output layer
+        self.model.fc = torch.nn.Linear(self.model.fc.in_features, num_labels)
+
+        # Set device
+        self.model.to(self.device)
+
+    def forward(self, x):
+        self.model = self.model.to(self.device)  # Ensure the entire model is on the correct device
         x = x.to(self.device)
         return self.model(x)
 
