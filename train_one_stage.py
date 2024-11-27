@@ -97,7 +97,7 @@ params = {
     "lr": 0.001,
     "save_epoch": 5,
     "batch_size": 16,
-    "num_epochs": 10,
+    "num_epochs": 50,
     "num_labels": 1,
     "input_channels": 1,
     "optimizer": "adam",
