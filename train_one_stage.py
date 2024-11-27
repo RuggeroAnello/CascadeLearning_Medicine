@@ -58,9 +58,12 @@ targets = {
             # "pleural_effusion": 15,
             # "pleural_other": 16,
             # "fracture": 17,
-            "support_devices": 18,
-            # "AP/PA_mapped": 22,
-            # add other the other columns
+            "support_devices": 18, 
+            # 'patient_ID': 19, 
+            # 'sex_mapped': 20, 
+            # 'frontal/lateral_mapped': 21,
+            # "ap/pa_mapped": 22,
+            # add the other columns
         }
 
 train_dataset = CheXpertDataset(
