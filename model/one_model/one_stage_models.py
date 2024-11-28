@@ -114,7 +114,7 @@ class AbstractOneStageModel(torch.nn.Module):
             path = os.path.join(path, f"model_epoch_{epoch}.pth")
         else:
             path = os.path.join(path, "model.pth")
-        torch.save(model.state_dict(), path)
+        torch.save(model, path)
 
     def save_hparams(self, path: str):
         if not os.path.exists(os.path.dirname(path)):
@@ -196,11 +196,14 @@ class AbstractOneStageModel(torch.nn.Module):
         # Activate the outputs to get the predictions
         outputs = torch.sigmoid(outputs).squeeze()
 
+        predictions = (outputs > self.confidence_threshold).long()
+
         # Update metrics
-        for metric in metrics.values():
+        for metric_name, metric in metrics.items():
             # TODO (for the future): doesn't work for multiclass
-            # TODO (now) binary recall doesn't work yet [Done]
-            predictions = (outputs > self.confidence_threshold).long()
+            # TODO check what input is needed for the metrics
+            # if metric_name == "accuracy":
+            #    metric.update(outputs, labels.squeeze().long())
             metric.update(predictions, labels.squeeze().long())  # Ensure labels are 1D
 
         return loss
