@@ -85,21 +85,21 @@ targets = {
     # "pleural_effusion": 15,
     # "pleural_other": 16,
     # "fracture": 17,
-    # "support_devices": 18,
-    "ap/pa map": 22,
+    "support_devices": 18,
+    # "ap/pa map": 22,
 }
 # _________________________________________________________________
 
 # _________________________________________________________________	
 # 2: CHANGE HERE FOR DIFFERENT MODEL
 train_dataset = CheXpertDataset(
-    csv_file="./data/train_new.csv",
+    csv_file="./data/splitted/clean_PA_train_new.csv",
     root_dir="../image_data/",
     targets=targets,
     transform=transform,
 )
 val_dataset = CheXpertDataset(
-    csv_file="./data/valid.csv",
+    csv_file="./data/splitted/clean_PA_valid.csv",
     root_dir="../image_data/",
     targets=targets,
     transform=val_transform,
@@ -146,7 +146,7 @@ model.set_labels(train_dataset.labels)
 # _________________________________________________________________
 # 4: CHANGE HERE FOR DIFFERENT MODEL
 # Train the model
-task = "first_stage_pred_ap-pa"
+task = "second_stage_pa_pred_sup-dev"
 # _________________________________________________________________
 
 dirname = os.getcwd()

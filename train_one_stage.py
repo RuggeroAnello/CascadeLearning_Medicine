@@ -146,7 +146,7 @@ model.set_labels(train_dataset.labels)
 # _________________________________________________________________
 # 4: CHANGE HERE FOR DIFFERENT MODEL
 # Train the model
-task = "one_stage_support_devices"
+task = "one_stage_pred_sup-dev"
 # _________________________________________________________________
 
 dirname = os.getcwd()
