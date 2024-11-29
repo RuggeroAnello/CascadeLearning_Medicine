@@ -26,5 +26,5 @@ echo "DEACTIVATED CONDA ENVIRONMENT"
 conda activate personalized_ml # If this does not work try 'source activate ptl'
 echo "ACTIVATED 'personlized_ml' CONDA ENVIRONMENT"
 # run the program
-python train_one_stage.py
+python ../train_one_stage.py
                                            
