@@ -5,9 +5,9 @@
 # - output and error file paths
 # - python command at the end
 
-#SBATCH --job-name=second_stage_ap_pred_sup-dev
-#SBATCH --output=/vol/aimspace/projects/practical_WS2425/cascade_learning/slurm_out/second_stage_ap_pred_sup-dev-%A.out  # Standard output of the script (Can be absolute or relative path). %A adds the job id to the file name so you can launch the same script multiple times and get different logging files
-#SBATCH --error=/vol/aimspace/projects/practical_WS2425/cascade_learning/slurm_out/second_stage_ap_pred_sup-dev-%A.err  # Standard error of the script
+#SBATCH --job-name=second_stage_pa_pred_sup-dev
+#SBATCH --output=/vol/aimspace/projects/practical_WS2425/cascade_learning/slurm_out/second_stage_pa_pred_sup-dev-%A.out  # Standard output of the script (Can be absolute or relative path). %A adds the job id to the file name so you can launch the same script multiple times and get different logging files
+#SBATCH --error=/vol/aimspace/projects/practical_WS2425/cascade_learning/slurm_out/second_stage_pa_pred_sup-dev-%A.err  # Standard error of the script
 #SBATCH --mail-user=msagerer1@gmail.com
 #SBATCH --mail-type=ALL
 #SBATCH --time=2-12:00:00  # Limit on the total run time (format: days-hours:minutes:seconds)
@@ -31,5 +31,5 @@ echo "DEACTIVATED CONDA ENVIRONMENT"
 conda activate personalized_ml # If this does not work try 'source activate ptl'
 echo "ACTIVATED 'personlized_ml' CONDA ENVIRONMENT"
 # run the program
-python ../train_second_stage_ap.py
+python train_second_stage_pa.py
                                            
