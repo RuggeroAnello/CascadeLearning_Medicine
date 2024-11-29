@@ -5,9 +5,10 @@
 
 # It is indicated with "CHANGE HERE FOR DIFFERENT MODEL" in the
 # code what needs to be changes. It is the following:
-# - The target for the training
-# - The model that is used
-# - The train and valid set
+# - Select target for the training
+# - Specify model that is used
+# - Select the train and valid set
+# - Define the task that is trained
 
 import torch
 import os
@@ -65,7 +66,7 @@ val_transform = transforms.Compose(
     ]
 )
 # _________________________________________________________________
-# CHANGE HERE FOR DIFFERENT MODEL
+# 1: CHANGE HERE FOR DIFFERENT MODEL
 targets = {
     # "sex": 1,
     # "age": 2,
@@ -84,15 +85,15 @@ targets = {
     # "pleural_effusion": 15,
     # "pleural_other": 16,
     # "fracture": 17,
-    # "support_devices": 18,
-    "ap/pa map": 22,
+    "support_devices": 18,
+    # "ap/pa map": 22,
 }
 # _________________________________________________________________
 
 # _________________________________________________________________	
-# CHANGE HERE FOR DIFFERENT MODEL
+# 2: CHANGE HERE FOR DIFFERENT MODEL
 train_dataset = CheXpertDataset(
-    csv_file="./data/train.csv",
+    csv_file="./data/train_new.csv",
     root_dir="../image_data/",
     targets=targets,
     transform=transform,
@@ -131,7 +132,7 @@ params = {
 }
 
 # _________________________________________________________________
-# CHANGE HERE FOR DIFFERENT MODEL
+# 3: CHANGE HERE FOR DIFFERENT MODEL
 model = ResNet50OneStage(
     params=params,
     num_labels=params["num_labels"],
@@ -142,8 +143,12 @@ model.set_labels(train_dataset.labels)
 
 # TODO: Put set_labels as a parameter of the Model
 
+# _________________________________________________________________
+# 4: CHANGE HERE FOR DIFFERENT MODEL
 # Train the model
-task = "first_stage_ap_pa"
+task = "one_stage_support_devices"
+# _________________________________________________________________
+
 dirname = os.getcwd()
 path = os.path.join(dirname, "logs", f"{model.name}_{task}")
 if not os.path.exists(path):
