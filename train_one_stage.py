@@ -1,3 +1,14 @@
+# NOTE: the base structure of this script can be used to train:
+# - the model of the one stage baseline
+# - The first model of the two stage cascading model
+# - The two models of the second stage of the cascading model
+
+# It is indicated with "CHANGE HERE FOR DIFFERENT MODEL" in the
+# code what needs to be changes. It is the following:
+# - The target for the training
+# - The model that is used
+# - The train and valid set
+
 import torch
 import os
 import torchvision.transforms as transforms
@@ -53,7 +64,8 @@ val_transform = transforms.Compose(
         transforms.ToTensor(),
     ]
 )
-
+# _________________________________________________________________
+# CHANGE HERE FOR DIFFERENT MODEL
 targets = {
     # "sex": 1,
     # "age": 2,
@@ -75,7 +87,10 @@ targets = {
     # "support_devices": 18,
     "ap/pa map": 22,
 }
+# _________________________________________________________________
 
+# _________________________________________________________________	
+# CHANGE HERE FOR DIFFERENT MODEL
 train_dataset = CheXpertDataset(
     csv_file="./data/train.csv",
     root_dir="../image_data/",
@@ -88,6 +103,7 @@ val_dataset = CheXpertDataset(
     targets=targets,
     transform=val_transform,
 )
+# _________________________________________________________________
 
 print(f"Train dataset size: {len(train_dataset)}")
 print(f"Valid dataset size: {len(val_dataset)}")
@@ -103,7 +119,7 @@ params = {
     "lr": 0.001,
     "save_epoch": 5,
     "batch_size": 32,
-    "num_epochs": 10,
+    "num_epochs": 100,
     "num_labels": 1,
     "input_channels": 1,
     "optimizer": "adam",
@@ -114,11 +130,14 @@ params = {
     "confidence_threshold": 0.5,
 }
 
+# _________________________________________________________________
+# CHANGE HERE FOR DIFFERENT MODEL
 model = ResNet50OneStage(
     params=params,
     num_labels=params["num_labels"],
     input_channels=params["input_channels"],
 )
+# _________________________________________________________________
 model.set_labels(train_dataset.labels)
 
 # TODO: Put set_labels as a parameter of the Model
