@@ -10,7 +10,7 @@ from torcheval.metrics import (
     BinaryPrecision,
     BinaryF1Score,
     BinaryAccuracy,
-    BinaryAUROC
+    BinaryAUROC,
 )
 
 from tqdm import tqdm
@@ -70,14 +70,16 @@ class AbstractOneStageModel(torch.nn.Module):
         self.confidence_threshold = params.get("confidence_threshold", 0.5)
 
     def _configure_metrics(self, params):
-        # TODO: Add more metrics if needed 
+        # TODO: Add more metrics if needed
         self.val_metrics = {}
         self.test_metrics = {}
 
         metrics = params.get("metrics", [])
 
         # Accuracy is always calculated
-        self.val_metrics["accuracy"] = BinaryAccuracy() # These do NOT accept the confidence_threshold as argument -> done in validation_step
+        self.val_metrics["accuracy"] = (
+            BinaryAccuracy()
+        )  # These do NOT accept the confidence_threshold as argument -> done in validation_step
         self.test_metrics["accuracy"] = BinaryAccuracy()
 
         if "precision" in metrics:
@@ -112,7 +114,7 @@ class AbstractOneStageModel(torch.nn.Module):
             path = os.path.join(path, f"model_epoch_{epoch}.pth")
         else:
             path = os.path.join(path, "model.pth")
-        torch.save(model.state_dict(), path)
+        torch.save(model, path)
 
     def save_hparams(self, path: str):
         if not os.path.exists(os.path.dirname(path)):
@@ -129,7 +131,7 @@ class AbstractOneStageModel(torch.nn.Module):
         Create a WeightedRandomSampler for class imbalances
         """
         class_counts = {l: np.sum(dataset.labels == l) for l in self.unique_labels}
-        weights = {l: 1.0 / max(class_counts[l], 1) for l in self.unique_labels} 
+        weights = {l: 1.0 / max(class_counts[l], 1) for l in self.unique_labels}
         sample_weights = np.array([weights[l] for l in dataset.labels])
         return WeightedRandomSampler(
             sample_weights, len(sample_weights), replacement=True
@@ -194,11 +196,14 @@ class AbstractOneStageModel(torch.nn.Module):
         # Activate the outputs to get the predictions
         outputs = torch.sigmoid(outputs).squeeze()
 
+        predictions = (outputs > self.confidence_threshold).long()
+
         # Update metrics
-        for metric in metrics.values():
+        for metric_name, metric in metrics.items():
             # TODO (for the future): doesn't work for multiclass
-            # TODO (now) binary recall doesn't work yet [Done]
-            predictions = (outputs > self.confidence_threshold).long()
+            # TODO check what input is needed for the metrics
+            # if metric_name == "accuracy":
+            #    metric.update(outputs, labels.squeeze().long())
             metric.update(predictions, labels.squeeze().long())  # Ensure labels are 1D
 
         return loss
@@ -286,7 +291,6 @@ class AbstractOneStageModel(torch.nn.Module):
                 except ZeroDivisionError:
                     metric_value = 0.0  # Handle edge case
                 tb_logger.add_scalar(f"Val/{metric_name}", metric_value, epoch)
-                
 
             # Save model at specified intervals
             if self.save_epoch and (epoch + 1) % self.save_epoch == 0:
@@ -309,7 +313,7 @@ class AbstractOneStageModel(torch.nn.Module):
 
         with torch.no_grad():
             for metric in self.test_metrics.values():
-                metric.reset()  
+                metric.reset()
             for test_iteration, batch in enumerate(test_loop):
                 # Perform the test step and accumulate the loss
                 loss = self._validation_step(
@@ -338,7 +342,7 @@ class AbstractOneStageModel(torch.nn.Module):
                 metric_value = 0.0  # Handle edge case
             tb_logger.add_scalar(f"Test/{metric_name}", metric_value)  # Log metrics
 
-            # TODO Test metrics computation and logging: Done 
+            # TODO Test metrics computation and logging: Done
             # Analogous to validation metrics just use self.test_metrics: Done
 
 
@@ -365,7 +369,9 @@ class ResNet50OneStage(AbstractOneStageModel):
 
         # Load pretrained model
         # Best available weights (currently alias for IMAGENET1K_V2)
-        self.model = torchvision.models.resnet50(weights="IMAGENET1K_V2").to(self.device)
+        self.model = torchvision.models.resnet50(weights="IMAGENET1K_V2").to(
+            self.device
+        )
 
         # Adapt input size of model to the image channels
         if input_channels != 3:
@@ -388,8 +394,10 @@ class ResNet50OneStage(AbstractOneStageModel):
         self.model.to(self.device)
 
     def forward(self, x):
-        self.model = self.model.to(self.device)  # Ensure the entire model is on the correct device
-        x = x.to(self.device)  
+        self.model = self.model.to(
+            self.device
+        )  # Ensure the entire model is on the correct device
+        x = x.to(self.device)
         return self.model(x)
 
     @property
@@ -419,7 +427,7 @@ class ResNet18OneStage(AbstractOneStageModel):
         )
 
         # Load pretrained model
-        self.model = torchvision.models.resnet18(weights="IMAGENET1K_V1").to(self.device)
+        self.model = torchvision.models.resnet18(weights="IMAGENET1K_V1")
 
         # Adapt input size of model to the image channels
         if input_channels != 3:
@@ -433,13 +441,18 @@ class ResNet18OneStage(AbstractOneStageModel):
             )
 
         # Replace the output layer
-        self.model.fc = torch.nn.Linear(self.model.fc.in_features, num_labels)
+        self.model.fc = torch.nn.Linear(
+            self.model.fc.in_features,
+            num_labels,
+        )
 
         # Set device
         self.model.to(self.device)
 
     def forward(self, x):
-        self.model = self.model.to(self.device)  # Ensure the entire model is on the correct device
+        self.model = self.model.to(
+            self.device
+        )  # Ensure the entire model is on the correct device
         x = x.to(self.device)
         return self.model(x)
 
@@ -470,7 +483,9 @@ class ResNet34OneStage(AbstractOneStageModel):
         )
 
         # Load pretrained model
-        self.model = torchvision.models.resnet34(weights="IMAGENET1K_V1").to(self.device)
+        self.model = torchvision.models.resnet34(weights="IMAGENET1K_V1").to(
+            self.device
+        )
 
         # Adapt input size of model to the image channels
         if input_channels != 3:
@@ -490,7 +505,9 @@ class ResNet34OneStage(AbstractOneStageModel):
         self.model.to(self.device)
 
     def forward(self, x):
-        self.model = self.model.to(self.device)  # Ensure the entire model is on the correct device
+        self.model = self.model.to(
+            self.device
+        )  # Ensure the entire model is on the correct device
         x = x.to(self.device)
         return self.model(x)
 
