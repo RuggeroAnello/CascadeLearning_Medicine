@@ -14,14 +14,14 @@ This repository contains several branches:
 
 The folders in the repository are structured as follows:
 - "data"                : Contains the csv files
-- "data_analysis"       : Contains the exploratory data analysis code.
-- "model"                 : Contains the code for all models.
   - "unprocessed"
   - **`splitted`**: Contains the modified and preprocessed CSV files. This includes:
     - `train.csv` and `valid.csv`: The processed training and validation sets.
     - `ap_train.csv` and `ap_valid.csv`: The subsets of `train.csv` and `valid.csv` that only include `AP` samples.
     - `pa_train.csv` and `pa_valid.csv`: The subsets of `train.csv` and `valid.csv` that only include `PA` samples.
     - 'To-do': Consider creating a new subfolder, e.g., **`AP_PA`**, to organize datasets processed for different segmentation techniques (e.g., by **Gender**, **Age**, etc.).
+- "data_analysis"       : Contains the exploratory data analysis code.
+- "model"               : Contains the code for all models.
 
 ## Prerequistes
 
