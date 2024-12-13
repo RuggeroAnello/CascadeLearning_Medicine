@@ -196,7 +196,7 @@ class AbstractOneStageModel(torch.nn.Module):
         # Activate the outputs to get the predictions
         outputs = torch.sigmoid(outputs).squeeze()
 
-        predictions = (outputs > self.confidence_threshold).long()
+        # predictions = (outputs > self.confidence_threshold).long()
 
         # Update metrics
         for metric_name, metric in metrics.items():
@@ -204,7 +204,7 @@ class AbstractOneStageModel(torch.nn.Module):
             # TODO check what input is needed for the metrics
             # if metric_name == "accuracy":
             #    metric.update(outputs, labels.squeeze().long())
-            metric.update(predictions, labels.squeeze().long())  # Ensure labels are 1D
+            metric.update(outputs, labels.squeeze())  # Ensure labels are 1D
 
         return loss
 
@@ -224,6 +224,8 @@ class AbstractOneStageModel(torch.nn.Module):
         loss_fn = self.loss_fn  # Use the loss function configured in the model
 
         self.model = self.model.to(self.device)
+
+        print(f"Device used {self.device}")
 
         for epoch in range(self.num_epochs):
             # Training
@@ -450,10 +452,11 @@ class ResNet18OneStage(AbstractOneStageModel):
         self.model.to(self.device)
 
     def forward(self, x):
-        self.model = self.model.to(
-            self.device
-        )  # Ensure the entire model is on the correct device
-        x = x.to(self.device)
+        # TODO remove
+        #self.model = self.model.to(
+        #    self.device
+        #)  # Ensure the entire model is on the correct device
+        #x = x.to(self.device)
         return self.model(x)
 
     @property

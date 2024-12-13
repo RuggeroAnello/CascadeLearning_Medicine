@@ -127,7 +127,7 @@ params = {
     # BCE with Sigmoid activation function
     "loss_fn": "torch.nn.BCEWithLogitsLoss()",
     # For multilabel: MultiLabelSoftMarginLoss
-    "metrics": ["accuracy", "f1_score", "precision", "recall", "confusion_matrix"],
+    "metrics": ["accuracy", "precision", "recall"],
     "confidence_threshold": 0.5,
 }
 
