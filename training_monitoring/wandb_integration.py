@@ -53,7 +53,7 @@ def get_transforms(norm=0.5):
                                transforms.Normalize((norm, norm, norm), (norm, norm, norm))])
 
 def get_data(transforms, batch_size=4):
-    trainset = torchvision.datasets.CIFAR10(root='../image_data', train=True,
+    trainset = torchvision.datasets.CIFAR10(root='../../image_data', train=True,
                                             download=True, transform=transforms)
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size,
                                             shuffle=True, num_workers=22)
@@ -65,10 +65,10 @@ def save_model(model, path):
 def train():
     config = {
         'norm': 0.5,
-        'batch_size': 2048,
+        'batch_size': 32768,
         'lr': 0.0015,
         'momentum': 0.9,
-        'epochs': 25
+        'epochs': 250
     }
     
     # setup training
