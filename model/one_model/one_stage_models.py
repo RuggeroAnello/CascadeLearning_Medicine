@@ -76,24 +76,26 @@ class AbstractOneStageModel(torch.nn.Module):
 
         metrics = params.get("metrics", [])
 
+        threshold = params.get("confidence_threshold", 0.5)
+
         # Accuracy is always calculated
-        self.val_metrics["accuracy"] = (
-            BinaryAccuracy()
+        self.val_metrics["accuracy"] = BinaryAccuracy(
+            threshold=threshold
         )  # These do NOT accept the confidence_threshold as argument -> done in validation_step
-        self.test_metrics["accuracy"] = BinaryAccuracy()
+        self.test_metrics["accuracy"] = BinaryAccuracy(threshold=threshold)
 
         if "precision" in metrics:
-            self.val_metrics["precision"] = BinaryPrecision()
-            self.test_metrics["precision"] = BinaryPrecision()
+            self.val_metrics["precision"] = BinaryPrecision(threshold=threshold)
+            self.test_metrics["precision"] = BinaryPrecision(threshold=threshold)
         if "recall" in metrics:
-            self.val_metrics["recall"] = BinaryRecall()
-            self.test_metrics["recall"] = BinaryRecall()
+            self.val_metrics["recall"] = BinaryRecall(threshold=threshold)
+            self.test_metrics["recall"] = BinaryRecall(threshold=threshold)
         if "f1" in metrics:
-            self.val_metrics["f1"] = BinaryF1Score()
-            self.test_metrics["f1"] = BinaryF1Score()
+            self.val_metrics["f1"] = BinaryF1Score(threshold=threshold)
+            self.test_metrics["f1"] = BinaryF1Score(threshold=threshold)
         if "auc" in metrics:
-            self.val_metrics["auc"] = BinaryAUROC()
-            self.test_metrics["auc"] = BinaryAUROC()
+            self.val_metrics["auc"] = BinaryAUROC(threshold=threshold)
+            self.test_metrics["auc"] = BinaryAUROC(threshold=threshold)
 
     def set_labels(self, labels):
         self.labels = labels  # Set labels from dataset
@@ -196,15 +198,14 @@ class AbstractOneStageModel(torch.nn.Module):
         # Activate the outputs to get the predictions
         outputs = torch.sigmoid(outputs).squeeze()
 
-        predictions = (outputs > self.confidence_threshold).long()
-
         # Update metrics
         for metric_name, metric in metrics.items():
             # TODO (for the future): doesn't work for multiclass
             # TODO check what input is needed for the metrics
             # if metric_name == "accuracy":
             #    metric.update(outputs, labels.squeeze().long())
-            metric.update(predictions, labels.squeeze().long())  # Ensure labels are 1D
+            labels = labels.squeeze().int()
+            metric.update(outputs, labels)  # Ensure labels are 1D
 
         return loss
 
@@ -218,9 +219,9 @@ class AbstractOneStageModel(torch.nn.Module):
         train_loader, val_loader = self._prepare_dataloaders(train_dataset, val_dataset)
 
         optimizer = self._configure_optimizer()
-        scheduler = torch.optim.lr_scheduler.StepLR(
-            optimizer, step_size=int(len(train_loader) / 5), gamma=0.7
-        )
+        # scheduler = torch.optim.lr_scheduler.StepLR(
+        #    optimizer, step_size=int(len(train_loader) / 5), gamma=0.7
+        # )
         loss_fn = self.loss_fn  # Use the loss function configured in the model
 
         self.model = self.model.to(self.device)
@@ -253,7 +254,7 @@ class AbstractOneStageModel(torch.nn.Module):
                     loss.item(),
                     epoch * len(train_loader) + train_iteration,
                 )
-            scheduler.step()
+            # scheduler.step()
 
             # Validation
             self.model.eval()
