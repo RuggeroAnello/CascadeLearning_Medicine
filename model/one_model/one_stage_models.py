@@ -2,6 +2,7 @@ import torch
 import json
 import torchvision
 import os
+import wandb
 import numpy as np
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, WeightedRandomSampler
@@ -198,23 +199,14 @@ class AbstractOneStageModel(torch.nn.Module):
         # Activate the outputs to get the predictions
         outputs = torch.sigmoid(outputs).squeeze()
 
-<<<<<<< HEAD
-        # predictions = (outputs > self.confidence_threshold).long()
-
-=======
->>>>>>> main
         # Update metrics
         for metric_name, metric in metrics.items():
             # TODO (for the future): doesn't work for multiclass
             # TODO check what input is needed for the metrics
             # if metric_name == "accuracy":
             #    metric.update(outputs, labels.squeeze().long())
-<<<<<<< HEAD
-            metric.update(outputs, labels.squeeze())  # Ensure labels are 1D
-=======
             labels = labels.squeeze().int()
             metric.update(outputs, labels)  # Ensure labels are 1D
->>>>>>> main
 
         return loss
 
@@ -259,12 +251,15 @@ class AbstractOneStageModel(torch.nn.Module):
                     train_loss=f"{training_loss / (train_iteration + 1):.6f}"
                 )
 
-                # Log training loss
+                # Log training loss with tensorboard
                 tb_logger.add_scalar(
                     "Train/loss",
                     loss.item(),
                     epoch * len(train_loader) + train_iteration,
                 )
+                # Log training loss with wandb
+                wandb.log({'epoch': epoch, 'train_loss': loss.item()})
+                
             scheduler.step()
 
             # Validation

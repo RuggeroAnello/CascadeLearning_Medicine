@@ -9,17 +9,17 @@
 # - Specify model that is used
 # - Select the train and valid set
 # - Define the task that is trained
-
-import torch
 import os
+import torch
 import torchvision.transforms as transforms
-
 from torch.utils.tensorboard import SummaryWriter
-from datetime import datetime
 
+from datetime import datetime
 from model.one_model.one_stage_models import ResNet50OneStage
 from data.dataset import CheXpertDataset
 
+import wandb
+print("Imported libaries")
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "True"  # To prevent the kernel from dying.
 
@@ -34,6 +34,23 @@ params_transform = {
     "contrast": (0.75, 1.25),
     "saturation": (0.75, 1.25),
     "brightness": (0.75, 1.25),
+}
+
+# Set the parameters for the model training to be saved later in a log file
+params = {
+    "train_transfrom": params_transform,
+    "lr": 0.001,
+    "save_epoch": 5,
+    "batch_size": 32,
+    "num_epochs": 100,
+    "num_labels": 1,
+    "input_channels": 1,
+    "optimizer": "adam",
+    # BCE with Sigmoid activation function
+    "loss_fn": "torch.nn.BCEWithLogitsLoss()",
+    # For multilabel: MultiLabelSoftMarginLoss
+    "metrics": ["accuracy", "precision", "recall"],
+    "confidence_threshold": 0.5,
 }
 
 transform = transforms.Compose(
@@ -93,13 +110,13 @@ targets = {
 # _________________________________________________________________	
 # 2: CHANGE HERE FOR DIFFERENT MODEL
 train_dataset = CheXpertDataset(
-    csv_file="./data/train_new.csv",
+    csv_file="./data/splitted/train.csv",
     root_dir="../image_data/",
     targets=targets,
     transform=transform,
 )
 val_dataset = CheXpertDataset(
-    csv_file="./data/valid.csv",
+    csv_file="./data/splitted/valid.csv",
     root_dir="../image_data/",
     targets=targets,
     transform=val_transform,
@@ -114,60 +131,44 @@ assert len(train_dataset.labels) == len(
     train_dataset
 ), "Mismatch between targets and dataset size!"
 
-# Set the parameters for the model training to be saved later in a log file
-params = {
-    "train_transfrom": params_transform,
-    "lr": 0.001,
-    "save_epoch": 5,
-    "batch_size": 32,
-    "num_epochs": 100,
-    "num_labels": 1,
-    "input_channels": 1,
-    "optimizer": "adam",
-    # BCE with Sigmoid activation function
-    "loss_fn": "torch.nn.BCEWithLogitsLoss()",
-    # For multilabel: MultiLabelSoftMarginLoss
-    "metrics": ["accuracy", "precision", "recall"],
-    "confidence_threshold": 0.5,
-}
+with wandb.init(project='WandB-Implementation', config=params, dir='./logs/wandb'):
+    # _________________________________________________________________
+    # 3: CHANGE HERE FOR DIFFERENT MODEL
+    model = ResNet50OneStage(
+        params=params,
+        num_labels=params["num_labels"],
+        input_channels=params["input_channels"],
+    )
+    # _________________________________________________________________
+    model.set_labels(train_dataset.labels)
 
-# _________________________________________________________________
-# 3: CHANGE HERE FOR DIFFERENT MODEL
-model = ResNet50OneStage(
-    params=params,
-    num_labels=params["num_labels"],
-    input_channels=params["input_channels"],
-)
-# _________________________________________________________________
-model.set_labels(train_dataset.labels)
+    # TODO: Put set_labels as a parameter of the Model
 
-# TODO: Put set_labels as a parameter of the Model
+    # _________________________________________________________________
+    # 4: CHANGE HERE FOR DIFFERENT MODEL
+    # Train the model
+    task = "one_stage_pred_sup-dev"
+    # _________________________________________________________________
 
-# _________________________________________________________________
-# 4: CHANGE HERE FOR DIFFERENT MODEL
-# Train the model
-task = "one_stage_pred_sup-dev"
-# _________________________________________________________________
-
-dirname = os.getcwd()
-path = os.path.join(dirname, "logs", f"{model.name}_{task}")
-if not os.path.exists(path):
+    dirname = os.getcwd()
+    path = os.path.join(dirname, "logs", f"{model.name}_{task}")
+    if not os.path.exists(path):
+        os.makedirs(path)
+        num_of_runs = 0
+    else:
+        num_of_runs = len(os.listdir(path))
+    path = os.path.join(
+        path, f"run_{num_of_runs:03d}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+    )
     os.makedirs(path)
-    num_of_runs = 0
-else:
-    num_of_runs = len(os.listdir(path))
-path = os.path.join(
-    path, f"run_{num_of_runs:03d}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
-)
-os.makedirs(path)
 
-# Create tensorboard logger
-tb_logger = SummaryWriter(path)
+    # Create tensorboard logger
+    tb_logger = SummaryWriter(path)
 
-# Save the model parameters
-model.save_hparams(path)
+    # Save the model parameters
+    model.save_hparams(path)
 
-# Train the model
-model.train(train_dataset, val_dataset, tb_logger, path)
+    # Train the model
+    model.train(train_dataset, val_dataset, tb_logger, path)
 
-torch.save(model, os.path.join(path, "model.pth"))
+    torch.save(model, os.path.join(path, "model.pth"))
