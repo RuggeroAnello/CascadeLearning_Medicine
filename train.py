@@ -3,23 +3,53 @@
 # - The first model of the two stage cascading model
 # - The two models of the second stage of the cascading model
 
+# Use the argument parser to specify the model type
+# run "python train.py --help" to see the options
+
 # It is indicated with "CHANGE HERE FOR DIFFERENT MODEL" in the
-# code what needs to be changes. It is the following:
+# code what can be changed:
 # - Select target for the training
 # - Specify model that is used
 # - Select the train and valid set
 # - Define the task that is trained
+
+# Argument parser
+import argparse
+parser = argparse.ArgumentParser(description="Train a model with different configurations.")
+parser.add_argument(
+    "--model_type",
+    type=str,
+    choices=["one_stage_baseline", "two_stage_first", "two_stage_second_ap", "two_stage_second_pa"],
+    required=True,
+    help="Specify the type of model to train."
+)
+args = parser.parse_args()
+
 import os
+from datetime import datetime
+
 import torch
 import torchvision.transforms as transforms
 from torch.utils.tensorboard import SummaryWriter
 
-from datetime import datetime
-from model.one_model.one_stage_models import ResNet50OneStage
+from model.one_model.one_stage_models import ResNet50OneStage, ResNet18OneStage
 from data.dataset import CheXpertDataset
 
 import wandb
+
 print("Imported libaries")
+
+# Set variable based on argument
+if args.model_type == "one_stage_baseline":
+    model_type = "one_stage_baseline"
+elif args.model_type == "two_stage_first":
+    model_type = "two_stage_first"
+elif args.model_type == "two_stage_second_ap":
+    model_type = "two_stage_second_ap"
+elif args.model_type == "two_stage_second_pa":
+    model_type = "two_stage_second_pa"
+else:
+    raise ValueError("Invalid model type specified.")
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "True"  # To prevent the kernel from dying.
 
@@ -82,9 +112,9 @@ val_transform = transforms.Compose(
         transforms.ToTensor(),
     ]
 )
-# _________________________________________________________________
-# 1: CHANGE HERE FOR DIFFERENT MODEL
-targets = {
+
+if model_type == "one_stage_baseline":
+    targets = {
     # "sex": 1,
     # "age": 2,
     # "frontal/lateral": 3,
@@ -105,51 +135,156 @@ targets = {
     "support_devices": 18,
     # "ap/pa map": 22,
 }
-# _________________________________________________________________
+elif model_type == "two_stage_first":
+    targets = {
+    # "sex": 1,
+    # "age": 2,
+    # "frontal/lateral": 3,
+    # "ap/pa": 4,
+    # "no_finding": 5,
+    # "enlarged_cardiomediastinum": 6,
+    # "cardiomegaly": 7,
+    # "lung_opacity": 8,
+    # "lung_lesion": 9,
+    # "edema": 10,
+    # "consolidation": 11,
+    # "pneumonia": 12,
+    # "atelectasis": 13,
+    # "pneumothorax": 14,
+    # "pleural_effusion": 15,
+    # "pleural_other": 16,
+    # "fracture": 17,
+    # "support_devices": 18,
+    "ap/pa map": 22,
+    }
+elif model_type == "two_stage_second_ap":
+    targets = {
+    # "sex": 1,
+    # "age": 2,
+    # "frontal/lateral": 3,
+    # "ap/pa": 4,
+    # "no_finding": 5,
+    # "enlarged_cardiomediastinum": 6,
+    # "cardiomegaly": 7,
+    # "lung_opacity": 8,
+    # "lung_lesion": 9,
+    # "edema": 10,
+    # "consolidation": 11,
+    # "pneumonia": 12,
+    # "atelectasis": 13,
+    # "pneumothorax": 14,
+    # "pleural_effusion": 15,
+    # "pleural_other": 16,
+    # "fracture": 17,
+    "support_devices": 18,
+    # "ap/pa map": 22,
+} 
+elif model_type == "two_stage_second_pa":
+    targets = {
+    # "sex": 1,
+    # "age": 2,
+    # "frontal/lateral": 3,
+    # "ap/pa": 4,
+    # "no_finding": 5,
+    # "enlarged_cardiomediastinum": 6,
+    # "cardiomegaly": 7,
+    # "lung_opacity": 8,
+    # "lung_lesion": 9,
+    # "edema": 10,
+    # "consolidation": 11,
+    # "pneumonia": 12,
+    # "atelectasis": 13,
+    # "pneumothorax": 14,
+    # "pleural_effusion": 15,
+    # "pleural_other": 16,
+    # "fracture": 17,
+    "support_devices": 18,
+    # "ap/pa map": 22,
+}
+else:
+    raise ValueError("Invalid model type specified.")
 
-# _________________________________________________________________	
 # 2: CHANGE HERE FOR DIFFERENT MODEL
+if model_type == "one_stage_baseline":
+    train_csv_file_path = "./data/splitted/train.csv"
+    val_csv_file_path = "./data/splitted/valid.csv"
+elif model_type == "two_stage_first":
+    train_csv_file_path = "./data/splitted/train.csv"
+    val_csv_file_path = "./data/splitted/valid.csv"
+elif model_type == "two_stage_second_ap":
+    train_csv_file_path = "data/splitted/ap_train.csv"
+    val_csv_file_path = "data/splitted/ap_valid.csv"
+elif model_type == "two_stage_second_pa":
+    train_csv_file_path = "data/splitted/pa_train.csv"
+    val_csv_file_path = "data/splitted/pa_valid.csv"
+else:
+    raise ValueError("Invalid model type specified.")
+
 train_dataset = CheXpertDataset(
-    csv_file="./data/splitted/train.csv",
+    csv_file=train_csv_file_path,
     root_dir="../image_data/",
     targets=targets,
     transform=transform,
 )
 val_dataset = CheXpertDataset(
-    csv_file="./data/splitted/valid.csv",
+    csv_file=val_csv_file_path,
     root_dir="../image_data/",
     targets=targets,
     transform=val_transform,
 )
-# _________________________________________________________________
 
 print(f"Train dataset size: {len(train_dataset)}")
 print(f"Valid dataset size: {len(val_dataset)}")
-
 
 assert len(train_dataset.labels) == len(
     train_dataset
 ), "Mismatch between targets and dataset size!"
 
 with wandb.init(project='WandB-Implementation', config=params, dir='./logs/wandb'):
-    # _________________________________________________________________
     # 3: CHANGE HERE FOR DIFFERENT MODEL
-    model = ResNet50OneStage(
-        params=params,
-        num_labels=params["num_labels"],
-        input_channels=params["input_channels"],
-    )
-    # _________________________________________________________________
+    if model_type == "one_stage_baseline":
+        model = ResNet50OneStage(
+            params=params,
+            num_labels=params["num_labels"],
+            input_channels=params["input_channels"],
+        )
+    elif model_type == "two_stage_first":
+        model = ResNet18OneStage(
+            params=params,
+            num_labels=params["num_labels"],
+            input_channels=params["input_channels"],
+        )
+    elif model_type == "two_stage_second_ap":
+        model = ResNet18OneStage(
+            params=params,
+            num_labels=params["num_labels"],
+            input_channels=params["input_channels"],
+        )
+    elif model_type == "two_stage_second_pa":
+        model = ResNet18OneStage(
+            params=params,
+            num_labels=params["num_labels"],
+            input_channels=params["input_channels"],
+        )
+    else:
+        raise ValueError("Invalid model type specified.")
+    
     model.set_labels(train_dataset.labels)
 
     # TODO: Put set_labels as a parameter of the Model
 
-    # _________________________________________________________________
     # 4: CHANGE HERE FOR DIFFERENT MODEL
-    # Train the model
-    task = "one_stage_pred_sup-dev"
-    # _________________________________________________________________
-
+    if model_type == "one_stage_baseline":
+        task = "one_stage_pred_sup-dev"
+    elif model_type == "two_stage_first":
+        task = "first_stage_pred_ap-pa"
+    elif model_type == "two_stage_second_ap":
+        task = "second_stage_ap_pred_sup-dev"
+    elif model_type == "two_stage_second_pa":
+        task = "second_stage_pa_pred_sup-dev"
+    else:
+        raise ValueError("Invalid model type specified.")
+    
     dirname = os.getcwd()
     path = os.path.join(dirname, "logs", f"{model.name}_{task}")
     if not os.path.exists(path):
