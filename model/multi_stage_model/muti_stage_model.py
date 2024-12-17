@@ -119,15 +119,24 @@ class TwoStageModel(torch.nn.Module):
         conf = torch.sigmoid(out_stage_one)
         pred = conf > self.confidence_threshold_first_ap_pa
 
-        result = []
+        idx_ap = pred.squeeze().nonzero(as_tuple=True)[0]
+        idx_pa = (~pred.squeeze()).nonzero(as_tuple=True)[0]
 
-        for i, o in enumerate(pred):
-            if o:
-                out_stage_two = self.model_ap(x[i].unsqueeze(0))
-            else:
-                out_stage_two = self.model_pa(x[i].unsqueeze(0))
-            result.append(out_stage_two)
-        return torch.tensor(result).unsqueeze(1).to(self.device)
+        x_ap = x[idx_ap]
+        x_pa = x[idx_pa]
+
+        out_ap = self.model_ap(x_ap) if x_ap.size(0) > 0 else None
+        out_pa = self.model_pa(x_pa) if x_pa.size(0) > 0 else None
+
+        output = torch.zeros(
+            (x.size(0), out_ap.size(1) if out_ap is not None else out_pa.size(1))
+        ).to(self.device)
+        if out_ap is not None:
+            output[idx_ap] = out_ap
+        if out_pa is not None:
+            output[idx_pa] = out_pa
+
+        return output
 
     @property
     def name(self):
@@ -173,9 +182,9 @@ class TwoStageModel(torch.nn.Module):
             test_dataset, batch_size=self.batch_size, shuffle=False
         )
 
-        self.model_ap_pa_classification.model.eval()
-        self.model_ap.model.eval()
-        self.model_pa.model.eval()
+        self.model_ap_pa_classification.eval()
+        self.model_ap.eval()
+        self.model_pa.eval()
 
         test_loop = tqdm(
             test_loader,

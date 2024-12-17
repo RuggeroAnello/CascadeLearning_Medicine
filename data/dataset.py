@@ -19,40 +19,41 @@ class CheXpertDataset(Dataset):
         self,
         csv_file: str,
         root_dir: str,
-        # Changed targets into a dictionary, it was previously a set
-        targets: dict, 
+        targets: dict,
         transform: transforms.Compose = None,
+        handle_uncertainty: str = "remove",  # Options: 'remove', 'zero', 'one'
     ):
         """
-        Initializes the CheXpert Dataset based on the data from two .csv-Files.
+        Initializes the CheXpert Dataset.
 
         Args:
             csv_file (str): Path to the csv file with annotations.
-            root_dir (str): Directory to path where CheXpert-v1.0-small ordner is placed.
+            root_dir (str): Directory where CheXpert images are stored.
             targets (dict): Dictionary of target labels.
-            transform (transforms.Compose, optional): Optional transform to be applied on a sample. Defaults to None.
+            transform (transforms.Compose, optional): Optional transform for images.
+            handle_uncertainty (str): How to handle -1 labels: 'remove', 'zero', or 'one'.
         """
         self.data = pd.read_csv(csv_file)
         self.root_dir = root_dir
         self.transform = transform
         self.targets = targets
-        
-        # Extract target_column(s)
+        self.handle_uncertainty = handle_uncertainty
+
+        # Extract target columns
         target_columns = [self.data.columns[i] for i in self.targets.values()]
 
-        ''' !!! TO-DO!
-        For the moment not dealing with '-1' labels, just removing them to see if everything else work. 
-            !!! TO-DO!
-        '''
-        self.data = self.data[self.data[target_columns].apply(lambda row: (row != -1.0).all(), axis=1)]
+        # Handle uncertain (-1) labels
+        if self.handle_uncertainty == "remove":
+            self.data = self.data[self.data[target_columns].apply(lambda row: (row != -1.0).all(), axis=1)]
+        elif self.handle_uncertainty in ["zero", "one"]:
+            replace_value = 0 if self.handle_uncertainty == "zero" else 1
+            self.data[target_columns] = self.data[target_columns].replace(-1.0, replace_value)
 
         # Extract labels
-        self.labels = self.data[target_columns].values.ravel().astype(int)
+        self.labels = self.data[target_columns].values.astype(int)
 
         # Find unique labels
         self.unique_labels = np.unique(self.labels)
-
-        print(f"Labels found: {self.unique_labels}")  # Debugging
 
     def __len__(self):
         return len(self.data)
