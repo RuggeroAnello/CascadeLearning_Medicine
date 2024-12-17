@@ -13,6 +13,8 @@
 # - Select the train and valid set
 # - Define the task that is trained
 
+print("Started training script")
+
 # Argument parser
 import argparse
 parser = argparse.ArgumentParser(description="Train a model with different configurations.")
@@ -25,19 +27,28 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
+print("Start importing libraries")
 import os
+print("Imported os")
 from datetime import datetime
+print("Imported datetime")
 
 import torch
+print("Imported torch")
 import torchvision.transforms as transforms
+print( "Imported torchvision.transforms")
 from torch.utils.tensorboard import SummaryWriter
+print("Imported torch.utils.tensorboard")
 
 from model.one_model.one_stage_models import ResNet50OneStage, ResNet18OneStage
+print("Imported models")
 from data.dataset import CheXpertDataset
+print("Imported cheXpert dataset")
 
 import wandb
+print("Imported wandb")
 
-print("Imported libaries")
+print("\nImported all libaries")
 
 # Set variable based on argument
 if args.model_type == "one_stage_baseline":
