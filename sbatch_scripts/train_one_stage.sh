@@ -21,15 +21,15 @@
 
 export PYTHONUNBUFFERED=true
 
-conda init
-echo "INITIALIZED CONDA"
+# conda init
+# echo "INITIALIZED CONDA"
 
 # activate corresponding environment
-conda deactivate # If you launch your script from a terminal where your environment is already loaded conda won't activate the environment. This guards against that. Not necessary if you always run this script from a clean terminal
-echo "DEACTIVATED CONDA ENVIRONMENT"
+# conda deactivate # If you launch your script from a terminal where your environment is already loaded conda won't activate the environment. This guards against that. Not necessary if you always run this script from a clean terminal
+# echo "DEACTIVATED CONDA ENVIRONMENT"
 
-conda activate personalized_ml # If this does not work try 'source activate ptl'
-echo "ACTIVATED 'personlized_ml' CONDA ENVIRONMENT"
+# conda activate personalized_ml # If this does not work try 'source activate ptl'
+# echo "ACTIVATED 'personlized_ml' CONDA ENVIRONMENT"
 # run the program
 python train.py --model_type one_stage_baseline
                                            
