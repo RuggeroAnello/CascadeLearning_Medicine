@@ -220,7 +220,7 @@ class AbstractOneStageModel(torch.nn.Module):
 
         optimizer = self._configure_optimizer()
         scheduler = torch.optim.lr_scheduler.StepLR(
-           optimizer, step_size=int(len(train_loader) / 5), gamma=0.7
+            optimizer, step_size=int(len(train_loader) / 5), gamma=0.7
         )
         loss_fn = self.loss_fn  # Use the loss function configured in the model
 
@@ -254,7 +254,7 @@ class AbstractOneStageModel(torch.nn.Module):
                     loss.item(),
                     epoch * len(train_loader) + train_iteration,
                 )
-            # scheduler.step()
+            scheduler.step()
 
             # Validation
             self.model.eval()
