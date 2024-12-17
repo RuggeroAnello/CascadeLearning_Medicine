@@ -219,9 +219,9 @@ class AbstractOneStageModel(torch.nn.Module):
         train_loader, val_loader = self._prepare_dataloaders(train_dataset, val_dataset)
 
         optimizer = self._configure_optimizer()
-        # scheduler = torch.optim.lr_scheduler.StepLR(
-        #    optimizer, step_size=int(len(train_loader) / 5), gamma=0.7
-        # )
+        scheduler = torch.optim.lr_scheduler.StepLR(
+           optimizer, step_size=int(len(train_loader) / 5), gamma=0.7
+        )
         loss_fn = self.loss_fn  # Use the loss function configured in the model
 
         self.model = self.model.to(self.device)
