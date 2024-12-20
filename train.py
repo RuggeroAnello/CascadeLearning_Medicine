@@ -72,10 +72,10 @@ params_transform = {
 # Set the parameters for the model training to be saved later in a log file
 params = {
     "train_transfrom": params_transform,
-    "lr": 0.001,
+    "lr": 0.0005,
     "save_epoch": 5,
-    "batch_size": 32,
-    "num_epochs": 5,
+    "batch_size": 256,
+    "num_epochs": 100,
     "num_labels": 1,
     "input_channels": 1,
     "optimizer": "adam",
@@ -243,7 +243,7 @@ assert len(train_dataset.labels) == len(
     train_dataset
 ), "Mismatch between targets and dataset size!"
 
-with wandb.init(project='WandB-Implementation', config=params, dir='./logs/wandb'):
+with wandb.init(project=model_type, config=params, dir='./logs/wandb'):
     # 3: CHANGE HERE FOR DIFFERENT MODEL
     if model_type == "one_stage_baseline":
         model = ResNet50OneStage(
@@ -271,6 +271,8 @@ with wandb.init(project='WandB-Implementation', config=params, dir='./logs/wandb
         )
     else:
         raise ValueError("Invalid model type specified.")
+    
+    wandb.watch(model, log="all")
     
     model.set_labels(train_dataset.labels)
 
