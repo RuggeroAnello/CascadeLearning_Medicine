@@ -29,24 +29,16 @@ args = parser.parse_args()
 
 print("Start importing libraries")
 import os
-print("Imported os")
 from datetime import datetime
-print("Imported datetime")
 
 import torch
-print("Imported torch")
 import torchvision.transforms as transforms
-print( "Imported torchvision.transforms")
 from torch.utils.tensorboard import SummaryWriter
-print("Imported torch.utils.tensorboard")
 
 from model.one_model.one_stage_models import ResNet50OneStage, ResNet18OneStage
-print("Imported models")
 from data.dataset import CheXpertDataset
-print("Imported cheXpert dataset")
 
 import wandb
-print("Imported wandb")
 
 print("\nImported all libaries")
 
@@ -83,7 +75,7 @@ params = {
     "lr": 0.001,
     "save_epoch": 5,
     "batch_size": 32,
-    "num_epochs": 100,
+    "num_epochs": 5,
     "num_labels": 1,
     "input_channels": 1,
     "optimizer": "adam",
