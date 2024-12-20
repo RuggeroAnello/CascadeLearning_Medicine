@@ -179,7 +179,7 @@ class TwoStageModel(torch.nn.Module):
 
     def test(self, test_dataset, tb_logger):
         test_loader = DataLoader(
-            test_dataset, batch_size=self.batch_size, shuffle=False
+            test_dataset, batch_size=self.batch_size, shuffle=False, num_workers=22
         )
 
         self.model_ap_pa_classification.eval()

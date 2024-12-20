@@ -144,14 +144,14 @@ class AbstractOneStageModel(torch.nn.Module):
         if self.use_weighted_sampler:
             sampler = self.create_weighted_sampler(train_dataset)
             train_loader = DataLoader(
-                train_dataset, batch_size=self.batch_size, sampler=sampler
+                train_dataset, batch_size=self.batch_size, sampler=sampler, num_workers=22
             )
         else:
             train_loader = DataLoader(
-                train_dataset, batch_size=self.batch_size, shuffle=True
+                train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=22
             )
 
-        val_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False)
+        val_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False, num_workers=22)
         return train_loader, val_loader
 
     def _general_end(self, outputs, mode):
@@ -291,6 +291,9 @@ class AbstractOneStageModel(torch.nn.Module):
 
             if tb_logger:
                 tb_logger.add_scalar("Val/loss", validation_loss, epoch)
+            
+            # Log validation loss with wandb
+            wandb.log({'validation_loss': validation_loss})
 
             for metric_name, metric in self.val_metrics.items():
                 try:
@@ -298,6 +301,9 @@ class AbstractOneStageModel(torch.nn.Module):
                 except ZeroDivisionError:
                     metric_value = 0.0  # Handle edge case
                 tb_logger.add_scalar(f"Val/{metric_name}", metric_value, epoch)
+                
+                # Log validation metrics with wandb
+                wandb.log({f"Val/{metric_name}": metric_value})
 
             # Save model at specified intervals
             if self.save_epoch and (epoch + 1) % self.save_epoch == 0:
@@ -305,7 +311,7 @@ class AbstractOneStageModel(torch.nn.Module):
 
     def test(self, test_dataset, tb_logger):
         test_loader = DataLoader(
-            test_dataset, batch_size=self.batch_size, shuffle=False
+            test_dataset, batch_size=self.batch_size, shuffle=False, num_workers=22
         )
 
         self.model.eval()
@@ -340,6 +346,9 @@ class AbstractOneStageModel(torch.nn.Module):
 
         if tb_logger:
             tb_logger.add_scalar("Test/loss", test_loss)  # Log test loss
+ 
+        # Log test loss with wandb
+        wandb.log({'test_loss': test_loss})
 
         # Compute and log test metrics
         for metric_name, metric in self.test_metrics.items():
@@ -348,6 +357,9 @@ class AbstractOneStageModel(torch.nn.Module):
             except ZeroDivisionError:
                 metric_value = 0.0  # Handle edge case
             tb_logger.add_scalar(f"Test/{metric_name}", metric_value)  # Log metrics
+            
+            # Log test metrics with wandb
+            wandb.log({'f"Test/{metric_name}"': metric_value})
 
             # TODO Test metrics computation and logging: Done
             # Analogous to validation metrics just use self.test_metrics: Done
