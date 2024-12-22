@@ -54,7 +54,7 @@ class CheXpertDataset(Dataset):
             )
 
         # Extract labels
-        self.labels = self.data[target_columns].values.astype(int)
+        self.labels = self.data[target_columns].values
 
         # Find unique labels
         self.unique_labels = np.unique(self.labels)
@@ -73,7 +73,7 @@ class CheXpertDataset(Dataset):
             img = self.transform(img)
 
         # Load dict with selected target labels
-        samples = self.labels[idx]
+        samples = self.labels[idx].astype(np.float64)
 
         # Ensure the labels are a 1D array
         return img, samples

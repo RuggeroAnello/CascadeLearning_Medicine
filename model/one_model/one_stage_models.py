@@ -20,6 +20,7 @@ class AbstractOneStageModel(torch.nn.Module):
     def __init__(
         self,
         params: dict,
+        targets: dict,
         **kwargs,
     ):
         """
@@ -33,7 +34,7 @@ class AbstractOneStageModel(torch.nn.Module):
         super().__init__()
         # Set device
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.labels = None
+        self.labels = targets.keys()
         self.unique_labels = None
 
         # Save hyperparameters
@@ -78,24 +79,30 @@ class AbstractOneStageModel(torch.nn.Module):
 
         threshold = params.get("confidence_threshold", 0.5)
 
-        # Accuracy is always calculated
-        self.val_metrics["accuracy"] = BinaryAccuracy(
-            threshold=threshold
-        )  # These do NOT accept the confidence_threshold as argument -> done in validation_step
-        self.test_metrics["accuracy"] = BinaryAccuracy(threshold=threshold)
+        for label in self.labels:
+            self.val_metrics[label] = {}
+            self.test_metrics[label] = {}
 
-        if "precision" in metrics:
-            self.val_metrics["precision"] = BinaryPrecision(threshold=threshold)
-            self.test_metrics["precision"] = BinaryPrecision(threshold=threshold)
-        if "recall" in metrics:
-            self.val_metrics["recall"] = BinaryRecall(threshold=threshold)
-            self.test_metrics["recall"] = BinaryRecall(threshold=threshold)
-        if "f1" in metrics:
-            self.val_metrics["f1"] = BinaryF1Score(threshold=threshold)
-            self.test_metrics["f1"] = BinaryF1Score(threshold=threshold)
-        if "auc" in metrics:
-            self.val_metrics["auc"] = BinaryAUROC(threshold=threshold)
-            self.test_metrics["auc"] = BinaryAUROC(threshold=threshold)
+            # Accuracy is always calculated
+            self.val_metrics[label]["accuracy"] = BinaryAccuracy(threshold=threshold)
+            self.test_metrics[label]["accuracy"] = BinaryAccuracy(threshold=threshold)
+
+            if "precision" in metrics:
+                self.val_metrics[label]["precision"] = BinaryPrecision(
+                    threshold=threshold
+                )
+                self.test_metrics[label]["precision"] = BinaryPrecision(
+                    threshold=threshold
+                )
+            if "recall" in metrics:
+                self.val_metrics[label]["recall"] = BinaryRecall(threshold=threshold)
+                self.test_metrics[label]["recall"] = BinaryRecall(threshold=threshold)
+            if "f1" in metrics:
+                self.val_metrics[label]["f1"] = BinaryF1Score(threshold=threshold)
+                self.test_metrics[label]["f1"] = BinaryF1Score(threshold=threshold)
+            if "auc" in metrics:
+                self.val_metrics[label]["auc"] = BinaryAUROC(threshold=threshold)
+                self.test_metrics[label]["auc"] = BinaryAUROC(threshold=threshold)
 
     def set_labels(self, labels):
         self.labels = labels  # Set labels from dataset
@@ -199,13 +206,15 @@ class AbstractOneStageModel(torch.nn.Module):
         outputs = torch.sigmoid(outputs).squeeze()
 
         # Update metrics
-        for metric_name, metric in metrics.items():
-            # TODO (for the future): doesn't work for multiclass
-            # TODO check what input is needed for the metrics
-            # if metric_name == "accuracy":
-            #    metric.update(outputs, labels.squeeze().long())
-            labels = labels.squeeze()
-            metric.update(outputs, labels)  # Ensure labels are 1D
+        for i, label in enumerate(self.labels):
+            for metric_name, metric in metrics[label].items():
+                # TODO (for the future): doesn't work for multiclass
+                # TODO check what input is needed for the metrics
+                # if metric_name == "accuracy":
+                #    metric.update(outputs, labels.squeeze().long())
+                labels_metric = labels[:, i].squeeze().int()
+                outputs_metric = outputs[:, i].squeeze()
+                metric.update(outputs_metric, labels_metric)  # Ensure labels are 1D
 
         return loss
 
@@ -269,8 +278,9 @@ class AbstractOneStageModel(torch.nn.Module):
 
             with torch.no_grad():
                 # Reset metrics before loop
-                for metric in self.val_metrics.values():
-                    metric.reset()
+                for label in self.val_metrics.keys():
+                    for metric in self.val_metrics[label].values():
+                        metric.reset()
                 for val_iteration, batch in enumerate(val_loop):
                     loss = self._validation_step(batch, self.val_metrics, loss_fn)
                     validation_loss += loss.item()
@@ -286,12 +296,15 @@ class AbstractOneStageModel(torch.nn.Module):
             if tb_logger:
                 tb_logger.add_scalar("Val/loss", validation_loss, epoch)
 
-            for metric_name, metric in self.val_metrics.items():
-                try:
-                    metric_value = metric.compute()
-                except ZeroDivisionError:
-                    metric_value = 0.0  # Handle edge case
-                tb_logger.add_scalar(f"Val/{metric_name}", metric_value, epoch)
+            for label in self.val_metrics.keys():
+                for metric_name, metric in self.val_metrics[label].items():
+                    try:
+                        metric_value = metric.compute()
+                    except ZeroDivisionError:
+                        metric_value = 0.0  # Handle edge case
+                    tb_logger.add_scalar(
+                        f"Val/{label}_{metric_name}", metric_value, epoch
+                    )
 
             # Save model at specified intervals
             if self.save_epoch and (epoch + 1) % self.save_epoch == 0:
@@ -313,8 +326,9 @@ class AbstractOneStageModel(torch.nn.Module):
         test_loss = 0
 
         with torch.no_grad():
-            for metric in self.test_metrics.values():
-                metric.reset()
+            for label in self.test_metrics.values():
+                for metric in self.test_metrics[label].values():
+                    metric.reset()
             for test_iteration, batch in enumerate(test_loop):
                 # Perform the test step and accumulate the loss
                 loss = self._validation_step(
@@ -336,15 +350,18 @@ class AbstractOneStageModel(torch.nn.Module):
             tb_logger.add_scalar("Test/loss", test_loss)  # Log test loss
 
         # Compute and log test metrics
-        for metric_name, metric in self.test_metrics.items():
-            try:
-                metric_value = metric.compute()
-            except ZeroDivisionError:
-                metric_value = 0.0  # Handle edge case
-            tb_logger.add_scalar(f"Test/{metric_name}", metric_value)  # Log metrics
+        for label in self.test_metrics.keys():
+            for metric_name, metric in self.test_metrics[label].items():
+                try:
+                    metric_value = metric.compute()
+                except ZeroDivisionError:
+                    metric_value = 0.0  # Handle edge case
+                tb_logger.add_scalar(
+                    f"Test/{label}_{metric_name}", metric_value
+                )  # Log metrics
 
-            # TODO Test metrics computation and logging: Done
-            # Analogous to validation metrics just use self.test_metrics: Done
+                # TODO Test metrics computation and logging: Done
+                # Analogous to validation metrics just use self.test_metrics: Done
 
 
 class ResNet50OneStage(AbstractOneStageModel):
