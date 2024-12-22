@@ -204,7 +204,7 @@ class AbstractOneStageModel(torch.nn.Module):
             # TODO check what input is needed for the metrics
             # if metric_name == "accuracy":
             #    metric.update(outputs, labels.squeeze().long())
-            labels = labels.squeeze().int()
+            labels = labels.squeeze()
             metric.update(outputs, labels)  # Ensure labels are 1D
 
         return loss

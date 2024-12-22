@@ -44,10 +44,14 @@ class CheXpertDataset(Dataset):
 
         # Handle uncertain (-1) labels
         if self.handle_uncertainty == "remove":
-            self.data = self.data[self.data[target_columns].apply(lambda row: (row != -1.0).all(), axis=1)]
+            self.data = self.data[
+                self.data[target_columns].apply(lambda row: (row != -1.0).all(), axis=1)
+            ]
         elif self.handle_uncertainty in ["zero", "one"]:
             replace_value = 0 if self.handle_uncertainty == "zero" else 1
-            self.data[target_columns] = self.data[target_columns].replace(-1.0, replace_value)
+            self.data[target_columns] = self.data[target_columns].replace(
+                -1.0, replace_value
+            )
 
         # Extract labels
         self.labels = self.data[target_columns].values.astype(int)
@@ -69,9 +73,7 @@ class CheXpertDataset(Dataset):
             img = self.transform(img)
 
         # Load dict with selected target labels
-        samples = np.zeros(len(self.targets))
-        for i, key in enumerate(self.targets.values()):
-            samples[i] = self.data.iloc[idx, key]
+        samples = self.labels[idx]
 
         # Ensure the labels are a 1D array
         return img, samples
