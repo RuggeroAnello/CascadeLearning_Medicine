@@ -213,7 +213,7 @@ class AbstractOneStageModel(torch.nn.Module):
                 # if metric_name == "accuracy":
                 #    metric.update(outputs, labels.squeeze().long())
                 labels_metric = labels[:, i].squeeze().int()
-                outputs_metric = outputs[:, i].squeeze()
+                outputs_metric = outputs[:, i]
                 metric.update(outputs_metric, labels_metric)  # Ensure labels are 1D
 
         return loss
