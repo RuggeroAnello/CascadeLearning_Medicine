@@ -69,6 +69,7 @@ class AbstractOneStageModel(torch.nn.Module):
         self.save_epoch = params.get("save_epoch", 1)
         self.confidence_threshold = params.get("confidence_threshold", 0.5)
 
+
     def _configure_metrics(self, params):
         # TODO: Add more metrics if needed
         self.val_metrics = {}
@@ -96,11 +97,13 @@ class AbstractOneStageModel(torch.nn.Module):
         if "auc" in metrics:
             self.val_metrics["auc"] = BinaryAUROC(threshold=threshold)
             self.test_metrics["auc"] = BinaryAUROC(threshold=threshold)
+    
 
     def set_labels(self, labels):
         self.labels = labels  # Set labels from dataset
         self.unique_labels = np.unique(self.labels)
         print(f"Model labels: {self.unique_labels}")
+
 
     def save_model(self, path: str, epoch: int = None):
         """
@@ -124,6 +127,31 @@ class AbstractOneStageModel(torch.nn.Module):
         path = os.path.join(path, "hparams.json")
         with open(path, "w") as f:
             json.dump(self.params, f)
+
+    
+    def apply_label_smoothing(labels, smoothing_value=0.2, uncertain_class_idx=None):
+        """
+        Apply label smoothing for uncertain labels.
+
+        Args:
+            labels (torch.Tensor): Ground truth labels (binary or multi-label format).
+            smoothing_value (float): Smoothing value to apply (epsilon).
+            uncertain_class_idx (list): Indices of uncertain classes to apply smoothing.
+
+        Returns:
+            torch.Tensor: Smoothed labels.
+        """
+        # Create a smoothed tensor
+        smoothed_labels = labels.float() * (1 - smoothing_value) + (smoothing_value / 2)
+        
+        if uncertain_class_idx is not None:
+            for idx in uncertain_class_idx:
+                mask = (labels[:, idx] == 1)  # Identify uncertain labels
+                smoothed_labels[mask, idx] = 1 - (smoothing_value / 2)  # Adjust for positive
+                smoothed_labels[~mask, idx] = smoothing_value / 2  # Adjust for negative
+                
+        return smoothed_labels
+    
 
     def load_hparams(self, path: str):
         self.params = json.load(open(path, "r"))
@@ -167,21 +195,32 @@ class AbstractOneStageModel(torch.nn.Module):
         Perform a single training step on the given batch.
 
         Args:
-            batch: image, labels
-            loss_fn: loss function to use for training
+            batch: (images, labels)
+            loss_fn: Loss function to use for training.
 
         Returns:
-            loss: loss value for the batch
+            loss: Loss value for the batch.
         """
-
         images, labels = batch
         images, labels = images.to(self.device), labels.to(self.device)
+
+        # Get uncertain class indices from the uncertainty_mapping
+        uncertain_class_idx = [
+            self.targets[class_name]
+            for class_name in self.uncertainty_mapping.keys()
+            if class_name in self.targets
+        ]
+
+        # Apply label smoothing
+        smoothed_labels = self.apply_label_smoothing(
+            labels, smoothing_value=0.2, uncertain_class_idx=uncertain_class_idx
+        )
 
         # Forward pass
         outputs = self.forward(images)
 
-        # Compute loss
-        loss = loss_fn(outputs, labels)
+        # Compute loss using smoothed labels
+        loss = loss_fn(outputs, smoothed_labels)
 
         return loss
 

@@ -75,7 +75,7 @@ class CheXpertDataset(Dataset):
         # Ensure the labels are a 1D array
         return img, samples
 
-    ''' Testing: 
+    ''' Could this implementation be faster?
 
         def __getitem__(self, idx):
             # Load image
@@ -90,5 +90,4 @@ class CheXpertDataset(Dataset):
 
             return img, label_vector
 
-        # Should be much faster
     '''
