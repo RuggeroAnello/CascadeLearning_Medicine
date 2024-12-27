@@ -46,8 +46,8 @@ class CheXpertDataset(Dataset):
         # Apply column-specific handling of uncertain values (-1)
         for column in target_columns:
             if column in self.uncertainty_mapping:
-                self.data[column] = self.data[column].replace(-1, self.uncertainty_mapping[column])
-
+                self.data[column] = self.data[column].replace([-1, -1.0], self.uncertainty_mapping[column], inplace=True)
+                
         # Extract labels
         self.labels = self.data[target_columns].values.astype(int)
 

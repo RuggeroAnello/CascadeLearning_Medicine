@@ -68,6 +68,8 @@ class AbstractOneStageModel(torch.nn.Module):
         self.use_weighted_sampler = params.get("use_weighted_sampler", False)
         self.save_epoch = params.get("save_epoch", 1)
         self.confidence_threshold = params.get("confidence_threshold", 0.5)
+        self.smoothing_value = params.get("smoothing_value", 0.2)
+
 
 
     def _configure_metrics(self, params):
@@ -129,27 +131,9 @@ class AbstractOneStageModel(torch.nn.Module):
             json.dump(self.params, f)
 
     
-    def apply_label_smoothing(labels, smoothing_value=0.2, uncertain_class_idx=None):
-        """
-        Apply label smoothing for uncertain labels.
-
-        Args:
-            labels (torch.Tensor): Ground truth labels (binary or multi-label format).
-            smoothing_value (float): Smoothing value to apply (epsilon).
-            uncertain_class_idx (list): Indices of uncertain classes to apply smoothing.
-
-        Returns:
-            torch.Tensor: Smoothed labels.
-        """
+    def apply_label_smoothing(self, labels):
         # Create a smoothed tensor
-        smoothed_labels = labels.float() * (1 - smoothing_value) + (smoothing_value / 2)
-        
-        if uncertain_class_idx is not None:
-            for idx in uncertain_class_idx:
-                mask = (labels[:, idx] == 1)  # Identify uncertain labels
-                smoothed_labels[mask, idx] = 1 - (smoothing_value / 2)  # Adjust for positive
-                smoothed_labels[~mask, idx] = smoothing_value / 2  # Adjust for negative
-                
+        smoothed_labels = labels.float() * (1 - self.smoothing_value) + (self.smoothing_value / 2)
         return smoothed_labels
     
 
@@ -160,12 +144,15 @@ class AbstractOneStageModel(torch.nn.Module):
         """
         Create a WeightedRandomSampler for class imbalances
         """
-        class_counts = {l: np.sum(dataset.labels == l) for l in self.unique_labels}
-        weights = {l: 1.0 / max(class_counts[l], 1) for l in self.unique_labels}
-        sample_weights = np.array([weights[l] for l in dataset.labels])
-        return WeightedRandomSampler(
-            sample_weights, len(sample_weights), replacement=True
-        )
+        label_counts = np.sum(dataset.labels, axis=0)  # Count occurrences of each label
+        weights = 1.0 / np.maximum(label_counts, 1)  # Inverse frequency of each label
+
+        # Now calculate sample weights for each instance
+        sample_weights = np.zeros(len(dataset))
+        for i, labels in enumerate(dataset.labels):
+            sample_weights[i] = np.sum(weights[labels == 1])  
+        
+        return WeightedRandomSampler(sample_weights, len(sample_weights), replacement=True)
 
     def _prepare_dataloaders(self, train_dataset, val_dataset):
         if self.use_weighted_sampler:
