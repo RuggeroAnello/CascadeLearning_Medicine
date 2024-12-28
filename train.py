@@ -72,10 +72,10 @@ params_transform = {
 # Set the parameters for the model training to be saved later in a log file
 params = {
     "train_transfrom": params_transform,
-    "lr": 0.0005,
+    "lr": 1e-1, # 5e-2, 1e-2, 5e-3, 1e-3, 5e-4, 1e-4, 5e-5, 1e-5
     "save_epoch": 5,
-    "batch_size": 256,
-    "num_epochs": 100,
+    "batch_size": 128,
+    "num_epochs": 10,
     "num_labels": 1,
     "input_channels": 1,
     "optimizer": "adam",
