@@ -470,10 +470,10 @@ class ResNet18OneStage(AbstractOneStageModel):
 
     def forward(self, x):
         # TODO remove
-        #self.model = self.model.to(
-        #    self.device
-        #)  # Ensure the entire model is on the correct device
-        #x = x.to(self.device)
+        self.model = self.model.to(
+           self.device
+        )  # Ensure the entire model is on the correct device
+        x = x.to(self.device)
         return self.model(x)
 
     @property

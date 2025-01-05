@@ -86,7 +86,7 @@ params = {
     "confidence_threshold": 0.5,
 }
 
-transform = transforms.Compose(squeue 
+transform = transforms.Compose( 
     [
         transforms.Resize(params_transform["resize"]),
         transforms.ToTensor(),
