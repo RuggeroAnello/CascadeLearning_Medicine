@@ -72,10 +72,10 @@ params_transform = {
 # Set the parameters for the model training to be saved later in a log file
 params = {
     "train_transfrom": params_transform,
-    "lr": 1e-1, # 5e-2, 1e-2, 5e-3, 1e-3, 5e-4, 1e-4, 5e-5, 1e-5
+    "lr": 1e-4,
     "save_epoch": 5,
     "batch_size": 128,
-    "num_epochs": 10,
+    "num_epochs": 100,
     "num_labels": 1,
     "input_channels": 1,
     "optimizer": "adam",
@@ -86,7 +86,7 @@ params = {
     "confidence_threshold": 0.5,
 }
 
-transform = transforms.Compose(
+transform = transforms.Compose(squeue 
     [
         transforms.Resize(params_transform["resize"]),
         transforms.ToTensor(),
