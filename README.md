@@ -42,3 +42,20 @@ In order to work with the CheXpert small dataset is has to be downloaded first:
 ##  Code Style
 
 Use the Black formatter (https://marketplace.visualstudio.com/items?itemName=ms-python.black-formatter) with default settings to keep the code consistent.
+
+## Run jobs with SLURM
+
+Execute a sbatch script:
+```sh
+sbatch your_script_name.sh
+```
+
+Show current jobs running
+```sh
+squeue
+```
+
+Show jobs for current user
+```sh
+squeue -u $USER
+```
