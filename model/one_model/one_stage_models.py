@@ -70,6 +70,7 @@ class AbstractOneStageModel(torch.nn.Module):
         self.use_weighted_sampler = params.get("use_weighted_sampler", False)
         self.save_epoch = params.get("save_epoch", 1)
         self.confidence_threshold = params.get("confidence_threshold", 0.5)
+        self.num_workers = params.get("num_workers", 22)
 
     def _configure_metrics(self, params):
         # TODO: Add more metrics if needed
@@ -126,6 +127,15 @@ class AbstractOneStageModel(torch.nn.Module):
             path = os.path.join(path, "model.pth")
         torch.save(model, path)
 
+    def load_model(self, path: str):
+        """
+        Load the model from the given path.
+
+        Args:
+            path (str): Path where the model is saved
+        """
+        self.model = torch.load(path, weights_only=False)
+
     def save_hparams(self, path: str):
         if not os.path.exists(os.path.dirname(path)):
             os.makedirs(os.path.dirname(path))
@@ -154,15 +164,21 @@ class AbstractOneStageModel(torch.nn.Module):
                 train_dataset,
                 batch_size=self.batch_size,
                 sampler=sampler,
-                num_workers=22,
+                num_workers=self.num_workers,
             )
         else:
             train_loader = DataLoader(
-                train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=22
+                train_dataset,
+                batch_size=self.batch_size,
+                shuffle=True,
+                num_workers=self.num_workers,
             )
 
         val_loader = DataLoader(
-            val_dataset, batch_size=self.batch_size, shuffle=False, num_workers=22
+            val_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
         )
         return train_loader, val_loader
 
@@ -329,7 +345,10 @@ class AbstractOneStageModel(torch.nn.Module):
 
     def test(self, test_dataset, tb_logger):
         test_loader = DataLoader(
-            test_dataset, batch_size=self.batch_size, shuffle=False, num_workers=22
+            test_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
         )
 
         self.model.eval()
@@ -343,7 +362,7 @@ class AbstractOneStageModel(torch.nn.Module):
         test_loss = 0
 
         with torch.no_grad():
-            for label in self.test_metrics.values():
+            for label in self.test_metrics.keys():
                 for metric in self.test_metrics[label].values():
                     metric.reset()
             for test_iteration, batch in enumerate(test_loop):
@@ -380,6 +399,7 @@ class AbstractOneStageModel(torch.nn.Module):
                 tb_logger.add_scalar(f"Test/{label}_{metric_name}", metric_value)
                 # Log test metrics with wandb
                 wandb.log({'f"Test/{metric_name}"': metric_value})
+                print(f"Test {label} {metric_name}: {metric_value}")
 
             # TODO Test metrics computation and logging: Done
             # Analogous to validation metrics just use self.test_metrics: Done

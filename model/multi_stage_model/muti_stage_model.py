@@ -2,6 +2,7 @@ import torch
 import json
 import torchvision
 import os
+import wandb
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -35,8 +36,9 @@ class TwoStageModel(torch.nn.Module):
 
         Args:
             params (dict): Dictionary containing the hyperparameters.
-            loss_fn (torch.nn.Module): Loss function to use for training
-            optimizer (torch.optim.Optimizer): Optimizer to use for training
+            model_ap_pa_classification (str): Path to the model for the first stage.
+            model_ap (str): Path to the model for the second stage (AP).
+            model_pa (str): Path to the model for the second stage (PA).
         """
         super().__init__()
         # Set device
@@ -113,6 +115,7 @@ class TwoStageModel(torch.nn.Module):
         self.confidence_threshold_first_ap_pa = params.get(
             "confidence_threshold_first_ap_pa", 0.5
         )
+        self.num_workers = params.get("num_workers", 22)
 
     def forward(self, x):
         out_stage_one = self.model_ap_pa_classification(x)
@@ -179,7 +182,10 @@ class TwoStageModel(torch.nn.Module):
 
     def test(self, test_dataset, tb_logger):
         test_loader = DataLoader(
-            test_dataset, batch_size=self.batch_size, shuffle=False, num_workers=22
+            test_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
         )
 
         self.model_ap_pa_classification.eval()
@@ -211,3 +217,5 @@ class TwoStageModel(torch.nn.Module):
             except ZeroDivisionError:
                 metric_value = 0.0  # Handle edge case
             tb_logger.add_scalar(f"Test/{metric_name}", metric_value)  # Log metrics
+            wandb.log({'f"Test/{metric_name}"': metric_value})
+            print(f"Test {metric_name}: {metric_value}")
