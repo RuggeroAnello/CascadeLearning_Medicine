@@ -146,6 +146,9 @@ class AbstractOneStageModel(torch.nn.Module):
     def load_hparams(self, path: str):
         self.params = json.load(open(path, "r"))
 
+    def get_num_labels(self, targets):
+        return len(targets)
+
     def create_weighted_sampler(self, dataset):
         """
         Create a WeightedRandomSampler for class imbalances
@@ -229,14 +232,15 @@ class AbstractOneStageModel(torch.nn.Module):
 
         # Update metrics
         for i, label in enumerate(self.labels):
-            for metric_name, metric in metrics[label].items():
-                # TODO (for the future): doesn't work for multiclass
-                # TODO check what input is needed for the metrics
-                # if metric_name == "accuracy":
-                #    metric.update(outputs, labels.squeeze().long())
-                labels_metric = labels[:, i].squeeze().int()
-                outputs_metric = outputs[:, i]
-                metric.update(outputs_metric, labels_metric)  # Ensure labels are 1D
+            for _, metric in metrics[label].items():
+                if len(self.labels) == 1:
+                    labels_metric = labels.squeeze().int()
+                    outputs_metric = outputs.squeeze()
+                    metric.update(outputs_metric, labels_metric)
+                else:
+                    labels_metric = labels[:, i].squeeze().int()
+                    outputs_metric = outputs[:, i]
+                    metric.update(outputs_metric, labels_metric)  # Ensure labels are 1D
 
         return loss
 
@@ -287,7 +291,7 @@ class AbstractOneStageModel(torch.nn.Module):
                     epoch * len(train_loader) + train_iteration,
                 )
                 # Log training loss with wandb
-                # wandb.log({"epoch": epoch, "train_loss": loss.item()})
+                wandb.log({"epoch": epoch, "train_loss": loss.item()})
 
             scheduler.step()
 
@@ -323,7 +327,7 @@ class AbstractOneStageModel(torch.nn.Module):
                 tb_logger.add_scalar("Val/loss", validation_loss, epoch)
 
             # Log validation loss with wandb
-            # wandb.log({"validation_loss": validation_loss})
+            wandb.log({"validation_loss": validation_loss})
 
             for label in self.val_metrics.keys():
                 for metric_name, metric in self.val_metrics[label].items():
@@ -336,7 +340,7 @@ class AbstractOneStageModel(torch.nn.Module):
                         f"Val/{label}_{metric_name}", metric_value, epoch
                     )
                     # Log validation metrics with wandb
-                    # wandb.log({f"Val/{metric_name}": metric_value})
+                    wandb.log({f"Val/{metric_name}": metric_value})
 
             # Save model at specified intervals
             if self.save_epoch and (epoch + 1) % self.save_epoch == 0:
@@ -358,7 +362,7 @@ class AbstractOneStageModel(torch.nn.Module):
             ncols=200,
         )
 
-        test_loss = 0
+        test_loss = 0.0
 
         with torch.no_grad():
             for label in self.test_metrics.keys():
@@ -386,6 +390,7 @@ class AbstractOneStageModel(torch.nn.Module):
 
         # Log test loss with wandb
         wandb.log({"test_loss": test_loss})
+        print(f"Test loss: {test_loss}")
 
         # Compute and log test metrics
         for label in self.test_metrics.keys():
@@ -409,7 +414,6 @@ class ResNet50OneStage(AbstractOneStageModel):
         self,
         params: dict,
         input_channels: int = 1,
-        num_labels: int = None,
         **kwargs,
     ):
         """
@@ -445,7 +449,7 @@ class ResNet50OneStage(AbstractOneStageModel):
         # Replace the output layer
         self.model.fc = torch.nn.Linear(
             self.model.fc.in_features,
-            num_labels,
+            self.get_num_labels(self.labels),
         )
 
         # Set device
@@ -468,7 +472,6 @@ class ResNet18OneStage(AbstractOneStageModel):
         self,
         params: dict,
         input_channels: int = 1,
-        num_labels: int = None,
         **kwargs,
     ):
         """
@@ -501,7 +504,7 @@ class ResNet18OneStage(AbstractOneStageModel):
         # Replace the output layer
         self.model.fc = torch.nn.Linear(
             self.model.fc.in_features,
-            num_labels,
+            self.get_num_labels(self.labels),
         )
 
         # Set device
@@ -558,7 +561,10 @@ class ResNet34OneStage(AbstractOneStageModel):
             )
 
         # Replace the output layer
-        self.model.fc = torch.nn.Linear(self.model.fc.in_features, num_labels)
+        self.model.fc = torch.nn.Linear(
+            self.model.fc.in_features,
+            self.get_num_labels(self.labels),
+        )
 
         # Set device
         self.model.to(self.device)
