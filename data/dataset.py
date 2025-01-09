@@ -45,8 +45,8 @@ class CheXpertDataset(Dataset):
 
         # Apply column-specific handling of uncertain values (-1)
         for column in target_columns:
-            if column in self.uncertainty_mapping:
-                self.data[column] = self.data[column].replace([-1, -1.0], self.uncertainty_mapping[column], inplace=True)
+            if column in self.uncertainty_mapping.keys():
+                self.data[column] = self.data[column].replace([-1, -1.0], self.uncertainty_mapping[column])
                 
         # Extract labels
         self.labels = self.data[target_columns].values.astype(int)
@@ -64,6 +64,7 @@ class CheXpertDataset(Dataset):
         # Load image
         img = Image.open(img_path)
 
+
         if self.transform:
             img = self.transform(img)
 
@@ -74,20 +75,3 @@ class CheXpertDataset(Dataset):
 
         # Ensure the labels are a 1D array
         return img, samples
-
-    ''' Could this implementation be faster?
-
-        def __getitem__(self, idx):
-            # Load image
-            img_path = os.path.join(self.root_dir, self.data.iloc[idx, 0])
-            img = Image.open(img_path)
-
-            if self.transform:
-                img = self.transform(img)
-
-            # Extract label vector for the current index
-            label_vector = self.labels[idx]
-
-            return img, label_vector
-
-    '''

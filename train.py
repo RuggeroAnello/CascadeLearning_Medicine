@@ -223,17 +223,23 @@ elif model_type == "two_stage_second_pa":
 else:
     raise ValueError("Invalid model type specified.")
 
+# FILLING based on paper: ‘Atelectasis’, ‘Edema’ and ‘Pleural Effusion’ -> treated as positive, while for the other classes they were treated as negative
+
+uncertainty_mapping = {'cardiomegaly': 0} # [...]
+
 train_dataset = CheXpertDataset(
     csv_file=train_csv_file_path,
     root_dir="../image_data/",
     targets=targets,
     transform=transform,
+    uncertainty_mapping=uncertainty_mapping,
 )
 val_dataset = CheXpertDataset(
     csv_file=val_csv_file_path,
     root_dir="../image_data/",
     targets=targets,
     transform=val_transform,
+    uncertainty_mapping=uncertainty_mapping,
 )
 
 print(f"Train dataset size: {len(train_dataset)}")
