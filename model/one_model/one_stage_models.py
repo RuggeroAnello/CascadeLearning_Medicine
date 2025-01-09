@@ -256,7 +256,6 @@ class AbstractOneStageModel(torch.nn.Module):
         loss_fn = self.loss_fn  # Use the loss function configured in the model
 
         self.model = self.model.to(self.device)
-
         print(f"Device used {self.device}")
 
         for epoch in range(self.num_epochs):
@@ -288,7 +287,7 @@ class AbstractOneStageModel(torch.nn.Module):
                     epoch * len(train_loader) + train_iteration,
                 )
                 # Log training loss with wandb
-                wandb.log({"epoch": epoch, "train_loss": loss.item()})
+                # wandb.log({"epoch": epoch, "train_loss": loss.item()})
 
             scheduler.step()
 
@@ -324,7 +323,7 @@ class AbstractOneStageModel(torch.nn.Module):
                 tb_logger.add_scalar("Val/loss", validation_loss, epoch)
 
             # Log validation loss with wandb
-            wandb.log({"validation_loss": validation_loss})
+            # wandb.log({"validation_loss": validation_loss})
 
             for label in self.val_metrics.keys():
                 for metric_name, metric in self.val_metrics[label].items():
@@ -337,7 +336,7 @@ class AbstractOneStageModel(torch.nn.Module):
                         f"Val/{label}_{metric_name}", metric_value, epoch
                     )
                     # Log validation metrics with wandb
-                    wandb.log({f"Val/{metric_name}": metric_value})
+                    # wandb.log({f"Val/{metric_name}": metric_value})
 
             # Save model at specified intervals
             if self.save_epoch and (epoch + 1) % self.save_epoch == 0:
