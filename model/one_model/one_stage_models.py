@@ -46,6 +46,9 @@ class AbstractOneStageModel(torch.nn.Module):
         # Save results
         self.results = {}
 
+        # Best model results
+        self.best_val_loss = np.inf
+
     def forward(self, x):
         raise NotImplementedError
 
@@ -111,21 +114,25 @@ class AbstractOneStageModel(torch.nn.Module):
         self.unique_labels = np.unique(self.labels)
         print(f"Model labels: {self.unique_labels}")
 
-    def save_model(self, path: str, epoch: int = None):
+    def save_model(self, path: str, epoch: int = None, best: bool = False):
         """
         Save the model and its weights to the given path.
 
         Args:
             path (str): Path where the model should be saved
+            epoch (int): Epoch number to include in the model name
+            best (bool): Whether this is the best model
         """
-        model = self.model.to("cpu")
         if not os.path.exists(os.path.dirname(path)):
             os.makedirs(os.path.dirname(path))
         if epoch is not None:
             path = os.path.join(path, f"model_epoch_{epoch}.pth")
+        elif best:
+            path = os.path.join(path, "best_model.pth")
         else:
             path = os.path.join(path, "model.pth")
-        torch.save(model, path)
+        # self.model.to("cpu") if required move the model to self.device again after saving!
+        torch.save(self.model, path)
 
     def load_model(self, path: str):
         """
@@ -344,7 +351,12 @@ class AbstractOneStageModel(torch.nn.Module):
 
             # Save model at specified intervals
             if self.save_epoch and (epoch + 1) % self.save_epoch == 0:
-                self.save_model(path, epoch + 1)
+                self.save_model(path, epoch=epoch + 1)
+
+            # Save best model
+            if validation_loss < self.best_val_loss:
+                self.best_val_loss = validation_loss
+                self.save_model(path, best=True)
 
     def test(self, test_dataset, tb_logger):
         test_loader = DataLoader(
