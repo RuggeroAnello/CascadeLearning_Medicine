@@ -48,6 +48,7 @@ class AbstractOneStageModel(torch.nn.Module):
 
         # Best model results
         self.best_val_loss = np.inf
+        self.best_epoch = -1
 
     def forward(self, x):
         raise NotImplementedError
@@ -357,6 +358,9 @@ class AbstractOneStageModel(torch.nn.Module):
             if validation_loss < self.best_val_loss:
                 self.best_val_loss = validation_loss
                 self.save_model(path, best=True)
+                self.best_epoch = epoch
+
+        print(f"Best validation loss: {self.best_val_loss} at epoch {self.best_epoch}")
 
     def test(self, test_dataset, tb_logger):
         test_loader = DataLoader(
