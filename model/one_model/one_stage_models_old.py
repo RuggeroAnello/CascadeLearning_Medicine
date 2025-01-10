@@ -21,7 +21,6 @@ class AbstractOneStageModel(torch.nn.Module):
     def __init__(
         self,
         params: dict,
-        targets: dict,
         **kwargs,
     ):
         """
@@ -35,7 +34,7 @@ class AbstractOneStageModel(torch.nn.Module):
         super().__init__()
         # Set device
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.labels = targets.keys()
+        self.labels = None
         self.unique_labels = None
 
         # Save hyperparameters
@@ -58,7 +57,6 @@ class AbstractOneStageModel(torch.nn.Module):
         self.batch_size = params.get("batch_size", 32)
         self.num_epochs = params.get("num_epochs", 10)
         self.optimizer_name = params.get("optimizer", "adam")
-        self.label_smoothing = params.get("label_smoothing", 0.0)  # Default no smoothing
         # Map string loss function names to actual loss function classes
         loss_fn_str = params.get("loss_fn", "BCEWithLogitsLoss")
         loss_fn_mapping = {
@@ -71,7 +69,9 @@ class AbstractOneStageModel(torch.nn.Module):
         self.use_weighted_sampler = params.get("use_weighted_sampler", False)
         self.save_epoch = params.get("save_epoch", 1)
         self.confidence_threshold = params.get("confidence_threshold", 0.5)
-        self.num_workers = params.get("num_workers", 22)
+        self.smoothing_value = params.get("smoothing_value", 0.2)
+
+
 
     def _configure_metrics(self, params):
         # TODO: Add more metrics if needed
@@ -82,35 +82,31 @@ class AbstractOneStageModel(torch.nn.Module):
 
         threshold = params.get("confidence_threshold", 0.5)
 
-        for label in self.labels:
-            self.val_metrics[label] = {}
-            self.test_metrics[label] = {}
+        # Accuracy is always calculated
+        self.val_metrics["accuracy"] = BinaryAccuracy(
+            threshold=threshold
+        )  # These do NOT accept the confidence_threshold as argument -> done in validation_step
+        self.test_metrics["accuracy"] = BinaryAccuracy(threshold=threshold)
 
-            # Accuracy is always calculated
-            self.val_metrics[label]["accuracy"] = BinaryAccuracy(threshold=threshold)
-            self.test_metrics[label]["accuracy"] = BinaryAccuracy(threshold=threshold)
-
-            if "precision" in metrics:
-                self.val_metrics[label]["precision"] = BinaryPrecision(
-                    threshold=threshold
-                )
-                self.test_metrics[label]["precision"] = BinaryPrecision(
-                    threshold=threshold
-                )
-            if "recall" in metrics:
-                self.val_metrics[label]["recall"] = BinaryRecall(threshold=threshold)
-                self.test_metrics[label]["recall"] = BinaryRecall(threshold=threshold)
-            if "f1" in metrics:
-                self.val_metrics[label]["f1"] = BinaryF1Score(threshold=threshold)
-                self.test_metrics[label]["f1"] = BinaryF1Score(threshold=threshold)
-            if "auc" in metrics:
-                self.val_metrics[label]["auc"] = BinaryAUROC(threshold=threshold)
-                self.test_metrics[label]["auc"] = BinaryAUROC(threshold=threshold)
+        if "precision" in metrics:
+            self.val_metrics["precision"] = BinaryPrecision(threshold=threshold)
+            self.test_metrics["precision"] = BinaryPrecision(threshold=threshold)
+        if "recall" in metrics:
+            self.val_metrics["recall"] = BinaryRecall(threshold=threshold)
+            self.test_metrics["recall"] = BinaryRecall(threshold=threshold)
+        if "f1" in metrics:
+            self.val_metrics["f1"] = BinaryF1Score(threshold=threshold)
+            self.test_metrics["f1"] = BinaryF1Score(threshold=threshold)
+        if "auc" in metrics:
+            self.val_metrics["auc"] = BinaryAUROC(threshold=threshold)
+            self.test_metrics["auc"] = BinaryAUROC(threshold=threshold)
+    
 
     def set_labels(self, labels):
         self.labels = labels  # Set labels from dataset
         self.unique_labels = np.unique(self.labels)
         print(f"Model labels: {self.unique_labels}")
+
 
     def save_model(self, path: str, epoch: int = None):
         """
@@ -128,15 +124,6 @@ class AbstractOneStageModel(torch.nn.Module):
             path = os.path.join(path, "model.pth")
         torch.save(model, path)
 
-    def load_model(self, path: str):
-        """
-        Load the model from the given path.
-
-        Args:
-            path (str): Path where the model is saved
-        """
-        self.model = torch.load(path, weights_only=False)
-
     def save_hparams(self, path: str):
         if not os.path.exists(os.path.dirname(path)):
             os.makedirs(os.path.dirname(path))
@@ -144,46 +131,42 @@ class AbstractOneStageModel(torch.nn.Module):
         with open(path, "w") as f:
             json.dump(self.params, f)
 
+    
+    def apply_label_smoothing(self, labels):
+        # Create a smoothed tensor
+        smoothed_labels = labels.float() * (1 - self.smoothing_value) + (self.smoothing_value / 2)
+        return smoothed_labels
+    
+
     def load_hparams(self, path: str):
         self.params = json.load(open(path, "r"))
-
-    def get_num_labels(self, targets):
-        return len(targets)
 
     def create_weighted_sampler(self, dataset):
         """
         Create a WeightedRandomSampler for class imbalances
         """
-        class_counts = {l: np.sum(dataset.labels == l) for l in self.unique_labels}
-        weights = {l: 1.0 / max(class_counts[l], 1) for l in self.unique_labels}
-        sample_weights = np.array([weights[l] for l in dataset.labels])
-        return WeightedRandomSampler(
-            sample_weights, len(sample_weights), replacement=True
-        )
+        label_counts = np.sum(dataset.labels, axis=0)  # Count occurrences of each label
+        weights = 1.0 / np.maximum(label_counts, 1)  # Inverse frequency of each label
+
+        # Now calculate sample weights for each instance
+        sample_weights = np.zeros(len(dataset))
+        for i, labels in enumerate(dataset.labels):
+            sample_weights[i] = np.sum(weights[labels == 1])  
+        
+        return WeightedRandomSampler(sample_weights, len(sample_weights), replacement=True)
 
     def _prepare_dataloaders(self, train_dataset, val_dataset):
         if self.use_weighted_sampler:
             sampler = self.create_weighted_sampler(train_dataset)
             train_loader = DataLoader(
-                train_dataset,
-                batch_size=self.batch_size,
-                sampler=sampler,
-                num_workers=self.num_workers,
+                train_dataset, batch_size=self.batch_size, sampler=sampler, num_workers=22
             )
         else:
             train_loader = DataLoader(
-                train_dataset,
-                batch_size=self.batch_size,
-                shuffle=True,
-                num_workers=self.num_workers,
+                train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=22
             )
 
-        val_loader = DataLoader(
-            val_dataset,
-            batch_size=self.batch_size,
-            shuffle=False,
-            num_workers=self.num_workers,
-        )
+        val_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False, num_workers=22)
         return train_loader, val_loader
 
     def _general_end(self, outputs, mode):
@@ -194,50 +177,38 @@ class AbstractOneStageModel(torch.nn.Module):
         )
         acc = total_correct / len(self.dataset[mode])
         return avg_loss, acc
-    
-    def apply_label_smoothing(self, labels, smoothing=0.0):
-        """
-        Applies label smoothing to the labels tensor.
-        Args:
-            labels (Tensor): The tensor containing the true labels.
-            smoothing (float): Smoothing factor (default is 0.0).
-        Returns:
-            Tensor: The smoothed labels.
-            """
-        if labels.dim() > 1:  # If the labels are one-hot encoded
-            num_classes = labels.size(-1)
-            smoothed_labels = labels * (1 - smoothing) + smoothing / num_classes
-        else:  # If the labels are integer class labels
-            num_classes = labels.max().item() + 1
-            labels_one_hot = torch.nn.functional.one_hot(labels, num_classes=num_classes).float()
-            smoothed_labels = labels_one_hot * (1 - smoothing) + smoothing / num_classes
-
-        return smoothed_labels
 
     def _training_step(self, batch, loss_fn):
         """
         Perform a single training step on the given batch.
 
         Args:
-            batch: image, labels
-            loss_fn: loss function to use for training
+            batch: (images, labels)
+            loss_fn: Loss function to use for training.
 
         Returns:
-            loss: loss value for the batch
+            loss: Loss value for the batch.
         """
-
         images, labels = batch
         images, labels = images.to(self.device), labels.to(self.device)
+
+        # Get uncertain class indices from the uncertainty_mapping
+        uncertain_class_idx = [
+            self.targets[class_name]
+            for class_name in self.uncertainty_mapping.keys()
+            if class_name in self.targets
+        ]
+
+        # Apply label smoothing
+        smoothed_labels = self.apply_label_smoothing(
+            labels, smoothing_value=0.2, uncertain_class_idx=uncertain_class_idx
+        )
 
         # Forward pass
         outputs = self.forward(images)
 
-        # Apply label smoothing only for loss computation during training
-        if self.label_smoothing > 0.0:
-            smoothed_labels = self.apply_label_smoothing(labels, self.label_smoothing)
-            loss = loss_fn(outputs, smoothed_labels)
-        else:
-            loss = loss_fn(outputs, labels)
+        # Compute loss using smoothed labels
+        loss = loss_fn(outputs, smoothed_labels)
 
         return loss
 
@@ -248,23 +219,20 @@ class AbstractOneStageModel(torch.nn.Module):
         # Forward pass
         outputs = self.forward(images)
 
-        # Use hard labels for validation loss
-        loss = loss_fn(outputs, labels)  # Remove label smoothing here
-    
+        # Compute loss
+        loss = loss_fn(outputs, labels)
+
         # Activate the outputs to get the predictions
         outputs = torch.sigmoid(outputs).squeeze()
 
         # Update metrics
-        for i, label in enumerate(self.labels):
-            for _, metric in metrics[label].items():
-                if len(self.labels) == 1:
-                    labels_metric = labels.squeeze().int()
-                    outputs_metric = outputs.squeeze()
-                    metric.update(outputs_metric, labels_metric)
-                else:
-                    labels_metric = labels[:, i].squeeze().int()
-                    outputs_metric = outputs[:, i]
-                    metric.update(outputs_metric, labels_metric)  # Ensure labels are 1D
+        for metric_name, metric in metrics.items():
+            # TODO (for the future): doesn't work for multiclass
+            # TODO check what input is needed for the metrics
+            # if metric_name == "accuracy":
+            #    metric.update(outputs, labels.squeeze().long())
+            labels = labels.squeeze().int()
+            metric.update(outputs, labels)  # Ensure labels are 1D
 
         return loss
 
@@ -284,6 +252,7 @@ class AbstractOneStageModel(torch.nn.Module):
         loss_fn = self.loss_fn  # Use the loss function configured in the model
 
         self.model = self.model.to(self.device)
+
         print(f"Device used {self.device}")
 
         for epoch in range(self.num_epochs):
@@ -315,8 +284,8 @@ class AbstractOneStageModel(torch.nn.Module):
                     epoch * len(train_loader) + train_iteration,
                 )
                 # Log training loss with wandb
-                wandb.log({"epoch": epoch, "train_loss": loss.item()})
-
+                wandb.log({'epoch': epoch, 'train_loss': loss.item()})
+                
             scheduler.step()
 
             # Validation
@@ -332,9 +301,8 @@ class AbstractOneStageModel(torch.nn.Module):
 
             with torch.no_grad():
                 # Reset metrics before loop
-                for label in self.val_metrics.keys():
-                    for metric in self.val_metrics[label].values():
-                        metric.reset()
+                for metric in self.val_metrics.values():
+                    metric.reset()
                 for val_iteration, batch in enumerate(val_loop):
                     loss = self._validation_step(batch, self.val_metrics, loss_fn)
                     validation_loss += loss.item()
@@ -349,22 +317,19 @@ class AbstractOneStageModel(torch.nn.Module):
 
             if tb_logger:
                 tb_logger.add_scalar("Val/loss", validation_loss, epoch)
-
+            
             # Log validation loss with wandb
-            wandb.log({"validation_loss": validation_loss})
+            wandb.log({'validation_loss': validation_loss})
 
-            for label in self.val_metrics.keys():
-                for metric_name, metric in self.val_metrics[label].items():
-                    try:
-                        metric_value = metric.compute()
-                    except ZeroDivisionError:
-                        metric_value = 0.0  # Handle edge case
-                    # Log validation metrics with tensorboard
-                    tb_logger.add_scalar(
-                        f"Val/{label}_{metric_name}", metric_value, epoch
-                    )
-                    # Log validation metrics with wandb
-                    wandb.log({f"Val/{metric_name}": metric_value})
+            for metric_name, metric in self.val_metrics.items():
+                try:
+                    metric_value = metric.compute()
+                except ZeroDivisionError:
+                    metric_value = 0.0  # Handle edge case
+                tb_logger.add_scalar(f"Val/{metric_name}", metric_value, epoch)
+                
+                # Log validation metrics with wandb
+                wandb.log({f"Val/{metric_name}": metric_value})
 
             # Save model at specified intervals
             if self.save_epoch and (epoch + 1) % self.save_epoch == 0:
@@ -372,10 +337,7 @@ class AbstractOneStageModel(torch.nn.Module):
 
     def test(self, test_dataset, tb_logger):
         test_loader = DataLoader(
-            test_dataset,
-            batch_size=self.batch_size,
-            shuffle=False,
-            num_workers=self.num_workers,
+            test_dataset, batch_size=self.batch_size, shuffle=False, num_workers=22
         )
 
         self.model.eval()
@@ -386,12 +348,11 @@ class AbstractOneStageModel(torch.nn.Module):
             ncols=200,
         )
 
-        test_loss = 0.0
+        test_loss = 0
 
         with torch.no_grad():
-            for label in self.test_metrics.keys():
-                for metric in self.test_metrics[label].values():
-                    metric.reset()
+            for metric in self.test_metrics.values():
+                metric.reset()
             for test_iteration, batch in enumerate(test_loop):
                 # Perform the test step and accumulate the loss
                 loss = self._validation_step(
@@ -411,23 +372,20 @@ class AbstractOneStageModel(torch.nn.Module):
 
         if tb_logger:
             tb_logger.add_scalar("Test/loss", test_loss)  # Log test loss
-
+ 
         # Log test loss with wandb
-        wandb.log({"test_loss": test_loss})
-        print(f"Test loss: {test_loss}")
+        wandb.log({'test_loss': test_loss})
 
         # Compute and log test metrics
-        for label in self.test_metrics.keys():
-            for metric_name, metric in self.test_metrics[label].items():
-                try:
-                    metric_value = metric.compute()
-                except ZeroDivisionError:
-                    metric_value = 0.0  # Handle edge case
-                # Log test metrics with tensorboard
-                tb_logger.add_scalar(f"Test/{label}_{metric_name}", metric_value)
-                # Log test metrics with wandb
-                wandb.log({'f"Test/{metric_name}"': metric_value})
-                print(f"Test {label} {metric_name}: {metric_value}")
+        for metric_name, metric in self.test_metrics.items():
+            try:
+                metric_value = metric.compute()
+            except ZeroDivisionError:
+                metric_value = 0.0  # Handle edge case
+            tb_logger.add_scalar(f"Test/{metric_name}", metric_value)  # Log metrics
+            
+            # Log test metrics with wandb
+            wandb.log({'f"Test/{metric_name}"': metric_value})
 
             # TODO Test metrics computation and logging: Done
             # Analogous to validation metrics just use self.test_metrics: Done
@@ -438,6 +396,7 @@ class ResNet50OneStage(AbstractOneStageModel):
         self,
         params: dict,
         input_channels: int = 1,
+        num_labels: int = None,
         **kwargs,
     ):
         """
@@ -473,7 +432,7 @@ class ResNet50OneStage(AbstractOneStageModel):
         # Replace the output layer
         self.model.fc = torch.nn.Linear(
             self.model.fc.in_features,
-            self.get_num_labels(self.labels),
+            num_labels,
         )
 
         # Set device
@@ -496,6 +455,7 @@ class ResNet18OneStage(AbstractOneStageModel):
         self,
         params: dict,
         input_channels: int = 1,
+        num_labels: int = None,
         **kwargs,
     ):
         """
@@ -528,7 +488,7 @@ class ResNet18OneStage(AbstractOneStageModel):
         # Replace the output layer
         self.model.fc = torch.nn.Linear(
             self.model.fc.in_features,
-            self.get_num_labels(self.labels),
+            num_labels,
         )
 
         # Set device
@@ -536,10 +496,10 @@ class ResNet18OneStage(AbstractOneStageModel):
 
     def forward(self, x):
         # TODO remove
-        # self.model = self.model.to(
+        #self.model = self.model.to(
         #    self.device
-        # )  # Ensure the entire model is on the correct device
-        # x = x.to(self.device)
+        #)  # Ensure the entire model is on the correct device
+        #x = x.to(self.device)
         return self.model(x)
 
     @property
@@ -585,10 +545,7 @@ class ResNet34OneStage(AbstractOneStageModel):
             )
 
         # Replace the output layer
-        self.model.fc = torch.nn.Linear(
-            self.model.fc.in_features,
-            self.get_num_labels(self.labels),
-        )
+        self.model.fc = torch.nn.Linear(self.model.fc.in_features, num_labels)
 
         # Set device
         self.model.to(self.device)
