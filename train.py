@@ -75,7 +75,7 @@ params = {
     "lr": 1e-4,
     "save_epoch": 5,
     "batch_size": 128,
-    "num_epochs": 100,
+    "num_epochs": 50,
     "num_labels": 1,
     "input_channels": 1,
     "optimizer": "adam",
@@ -272,7 +272,7 @@ with wandb.init(project=model_type, config=params, dir='./logs/wandb'):
     else:
         raise ValueError("Invalid model type specified.")
     
-    wandb.watch(model, log="all")
+    # wandb.watch(model, log="all")
     
     model.set_labels(train_dataset.labels)
 
@@ -303,14 +303,15 @@ with wandb.init(project=model_type, config=params, dir='./logs/wandb'):
     os.makedirs(path)
 
     # Create tensorboard logger
-    tb_logger = SummaryWriter(path)
-
+    # tb_logger = SummaryWriter(path)
+    tb_logger = False
+    
     # Save the model parameters
     model.save_hparams(path)
 
     # Train the model
     model.train(train_dataset, val_dataset, tb_logger, path)
 
-    wandb.unwatch(model, log="all")
+    # wandb.unwatch(model)
     
     torch.save(model, os.path.join(path, "model.pth"))

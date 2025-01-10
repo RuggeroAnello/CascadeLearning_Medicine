@@ -252,11 +252,12 @@ class AbstractOneStageModel(torch.nn.Module):
                 )
 
                 # Log training loss with tensorboard
-                tb_logger.add_scalar(
-                    "Train/loss",
-                    loss.item(),
-                    epoch * len(train_loader) + train_iteration,
-                )
+                if tb_logger:
+                    tb_logger.add_scalar(
+                        "Train/loss",
+                        loss.item(),
+                        epoch * len(train_loader) + train_iteration,
+                    )
                 # Log training loss with wandb
                 wandb.log({'epoch': epoch, 'train_loss': loss.item()})
                 
@@ -300,7 +301,9 @@ class AbstractOneStageModel(torch.nn.Module):
                     metric_value = metric.compute()
                 except ZeroDivisionError:
                     metric_value = 0.0  # Handle edge case
-                tb_logger.add_scalar(f"Val/{metric_name}", metric_value, epoch)
+                
+                if tb_logger:
+                    tb_logger.add_scalar(f"Val/{metric_name}", metric_value, epoch)
                 
                 # Log validation metrics with wandb
                 wandb.log({f"Val/{metric_name}": metric_value})
@@ -356,7 +359,9 @@ class AbstractOneStageModel(torch.nn.Module):
                 metric_value = metric.compute()
             except ZeroDivisionError:
                 metric_value = 0.0  # Handle edge case
-            tb_logger.add_scalar(f"Test/{metric_name}", metric_value)  # Log metrics
+            
+            if tb_logger:
+                tb_logger.add_scalar(f"Test/{metric_name}", metric_value)  # Log metrics
             
             # Log test metrics with wandb
             wandb.log({'f"Test/{metric_name}"': metric_value})

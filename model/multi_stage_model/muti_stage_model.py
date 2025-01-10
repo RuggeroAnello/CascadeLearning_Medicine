@@ -210,4 +210,5 @@ class TwoStageModel(torch.nn.Module):
                 metric_value = metric.compute()
             except ZeroDivisionError:
                 metric_value = 0.0  # Handle edge case
-            tb_logger.add_scalar(f"Test/{metric_name}", metric_value)  # Log metrics
+            if tb_logger:
+               tb_logger.add_scalar(f"Test/{metric_name}", metric_value)  # Log metrics
