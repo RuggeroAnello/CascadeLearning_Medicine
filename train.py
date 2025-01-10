@@ -311,4 +311,6 @@ with wandb.init(project=model_type, config=params, dir='./logs/wandb'):
     # Train the model
     model.train(train_dataset, val_dataset, tb_logger, path)
 
+    wandb.unwatch(model, log="all")
+    
     torch.save(model, os.path.join(path, "model.pth"))
