@@ -338,7 +338,7 @@ class AbstractOneStageModel(torch.nn.Module):
                     epoch * len(train_loader) + train_iteration,
                 )
                 # Log training loss with wandb
-                # wandb.log({"epoch": epoch, "train_loss": loss.item()})
+                wandb.log({"epoch": epoch, "train_loss": loss.item()})
 
             scheduler.step()
 
@@ -376,7 +376,7 @@ class AbstractOneStageModel(torch.nn.Module):
                 tb_logger.add_scalar("Val/loss", validation_loss, epoch)
 
             # Log validation loss with wandb
-            # wandb.log({"validation_loss": validation_loss})
+            wandb.log({"validation_loss": validation_loss})
 
             for label in self.val_metrics.keys():
                 for metric_name, metric in self.val_metrics[label].items():
@@ -389,7 +389,7 @@ class AbstractOneStageModel(torch.nn.Module):
                     #    f"Val/{label}_{metric_name}", metric_value, epoch
                     # )
                     # Log validation metrics with wandb
-                    # wandb.log({f"Val/{metric_name}": metric_value})
+                    wandb.log({f"Val/{metric_name}": metric_value})
 
             for metric_name, metric in self.val_metrics_multilabel.items():
                 try:
@@ -397,7 +397,7 @@ class AbstractOneStageModel(torch.nn.Module):
                 except ZeroDivisionError:
                     metric_value = 0.0
                 # tb_logger.add_scalar(f"Val/{metric_name}", metric_value, epoch)
-                # wandb.log({f"Val/{metric_name}": metric_value})
+                wandb.log({f"Val/{metric_name}": metric_value})
 
             # Save model at specified intervals
             if self.save_epoch and (epoch + 1) % self.save_epoch == 0:
@@ -456,7 +456,7 @@ class AbstractOneStageModel(torch.nn.Module):
             tb_logger.add_scalar("Test/loss", test_loss)  # Log test loss
 
         # Log test loss with wandb
-        # wandb.log({"test_loss": test_loss})
+        wandb.log({"test_loss": test_loss})
         print(f"Test loss: {test_loss}")
 
         # Compute and log test metrics
@@ -469,7 +469,7 @@ class AbstractOneStageModel(torch.nn.Module):
                 # Log test metrics with tensorboard
                 # tb_logger.add_scalar(f"Test/{label}_{metric_name}", metric_value)
                 # Log test metrics with wandb
-                # wandb.log({'f"Test/{metric_name}"': metric_value})
+                wandb.log({'f"Test/{metric_name}"': metric_value})
                 print(f"Test {label} {metric_name}: {metric_value}")
 
         for metric_name, metric in self.test_metrics_multilabel.items():
@@ -478,7 +478,7 @@ class AbstractOneStageModel(torch.nn.Module):
             except ZeroDivisionError:
                 metric_value = 0.0
             # tb_logger.add_scalar(f"Test/{metric_name}", metric_value)
-            # wandb.log({f"Test/{metric_name}": metric_value})
+            wandb.log({f"Test/{metric_name}": metric_value})
 
             # TODO Test metrics computation and logging: Done
             # Analogous to validation metrics just use self.test_metrics: Done
