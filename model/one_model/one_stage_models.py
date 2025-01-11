@@ -12,6 +12,11 @@ from torcheval.metrics import (
     BinaryF1Score,
     BinaryAccuracy,
     BinaryAUROC,
+    AUC,
+    MultilabelAccuracy,
+    MultilabelAUPRC,
+    MultilabelPrecisionRecallCurve,
+    BinaryConfusionMatrix,
 )
 
 from tqdm import tqdm
@@ -81,6 +86,9 @@ class AbstractOneStageModel(torch.nn.Module):
         self.val_metrics = {}
         self.test_metrics = {}
 
+        self.val_metrics_multilabel = {}
+        self.test_metrics_multilabel = {}
+
         metrics = params.get("metrics", [])
 
         threshold = params.get("confidence_threshold", 0.5)
@@ -106,9 +114,37 @@ class AbstractOneStageModel(torch.nn.Module):
             if "f1" in metrics:
                 self.val_metrics[label]["f1"] = BinaryF1Score(threshold=threshold)
                 self.test_metrics[label]["f1"] = BinaryF1Score(threshold=threshold)
+            if "auroc" in metrics:
+                self.val_metrics[label]["auroc"] = BinaryAUROC()
+                self.test_metrics[label]["auroc"] = BinaryAUROC()
             if "auc" in metrics:
-                self.val_metrics[label]["auc"] = BinaryAUROC(threshold=threshold)
-                self.test_metrics[label]["auc"] = BinaryAUROC(threshold=threshold)
+                self.val_metrics[label]["auc"] = AUC()
+                self.test_metrics[label]["auc"] = AUC()
+            if "confusion_matrix" in metrics:
+                self.val_metrics[label]["confusion_matrix"] = BinaryConfusionMatrix()
+                self.test_metrics[label]["confusion_matrix"] = BinaryConfusionMatrix()
+        if len(self.labels) > 1:
+            if "multilabel_accuracy" in metrics:
+                self.val_metrics_multilabel["multilabel_accuracy"] = MultilabelAccuracy(
+                    threshold=threshold
+                )
+                self.test_metrics_multilabel["multilabel_accuracy"] = (
+                    MultilabelAccuracy(threshold=threshold)
+                )
+            if "multilabel_auprc" in metrics:
+                self.val_metrics_multilabel["multilabel_auprc"] = MultilabelAUPRC(
+                    num_labels=len(self.labels)
+                )
+                self.test_metrics_multilabel["multilabel_auprc"] = MultilabelAUPRC(
+                    num_labels=len(self.labels)
+                )
+            if "multilabel_precision_recall_curve" in metrics:
+                self.val_metrics_multilabel["multilabel_precision_recall_curve"] = (
+                    MultilabelPrecisionRecallCurve(num_labels=len(self.labels))
+                )
+                self.test_metrics_multilabel["multilabel_precision_recall_curve"] = (
+                    MultilabelPrecisionRecallCurve(num_labels=len(self.labels))
+                )
 
     def set_labels(self, labels):
         self.labels = labels  # Set labels from dataset
@@ -250,6 +286,9 @@ class AbstractOneStageModel(torch.nn.Module):
                     outputs_metric = outputs[:, i]
                     metric.update(outputs_metric, labels_metric)  # Ensure labels are 1D
 
+        for _, metric in self.val_metrics_multilabel.items():
+            metric.update(outputs, labels)
+
         return loss
 
     def _configure_optimizer(self):
@@ -299,7 +338,7 @@ class AbstractOneStageModel(torch.nn.Module):
                     epoch * len(train_loader) + train_iteration,
                 )
                 # Log training loss with wandb
-                wandb.log({"epoch": epoch, "train_loss": loss.item()})
+                # wandb.log({"epoch": epoch, "train_loss": loss.item()})
 
             scheduler.step()
 
@@ -319,6 +358,8 @@ class AbstractOneStageModel(torch.nn.Module):
                 for label in self.val_metrics.keys():
                     for metric in self.val_metrics[label].values():
                         metric.reset()
+                for metric in self.test_metrics_multilabel.values():
+                    metric.reset()
                 for val_iteration, batch in enumerate(val_loop):
                     loss = self._validation_step(batch, self.val_metrics, loss_fn)
                     validation_loss += loss.item()
@@ -335,7 +376,7 @@ class AbstractOneStageModel(torch.nn.Module):
                 tb_logger.add_scalar("Val/loss", validation_loss, epoch)
 
             # Log validation loss with wandb
-            wandb.log({"validation_loss": validation_loss})
+            # wandb.log({"validation_loss": validation_loss})
 
             for label in self.val_metrics.keys():
                 for metric_name, metric in self.val_metrics[label].items():
@@ -344,11 +385,19 @@ class AbstractOneStageModel(torch.nn.Module):
                     except ZeroDivisionError:
                         metric_value = 0.0  # Handle edge case
                     # Log validation metrics with tensorboard
-                    tb_logger.add_scalar(
-                        f"Val/{label}_{metric_name}", metric_value, epoch
-                    )
+                    # tb_logger.add_scalar(
+                    #    f"Val/{label}_{metric_name}", metric_value, epoch
+                    # )
                     # Log validation metrics with wandb
-                    wandb.log({f"Val/{metric_name}": metric_value})
+                    # wandb.log({f"Val/{metric_name}": metric_value})
+
+            for metric_name, metric in self.val_metrics_multilabel.items():
+                try:
+                    metric_value = metric.compute()
+                except ZeroDivisionError:
+                    metric_value = 0.0
+                # tb_logger.add_scalar(f"Val/{metric_name}", metric_value, epoch)
+                # wandb.log({f"Val/{metric_name}": metric_value})
 
             # Save model at specified intervals
             if self.save_epoch and (epoch + 1) % self.save_epoch == 0:
@@ -384,6 +433,8 @@ class AbstractOneStageModel(torch.nn.Module):
             for label in self.test_metrics.keys():
                 for metric in self.test_metrics[label].values():
                     metric.reset()
+            for metric in self.test_metrics_multilabel.values():
+                metric.reset()
             for test_iteration, batch in enumerate(test_loop):
                 # Perform the test step and accumulate the loss
                 loss = self._validation_step(
@@ -405,7 +456,7 @@ class AbstractOneStageModel(torch.nn.Module):
             tb_logger.add_scalar("Test/loss", test_loss)  # Log test loss
 
         # Log test loss with wandb
-        wandb.log({"test_loss": test_loss})
+        # wandb.log({"test_loss": test_loss})
         print(f"Test loss: {test_loss}")
 
         # Compute and log test metrics
@@ -416,10 +467,18 @@ class AbstractOneStageModel(torch.nn.Module):
                 except ZeroDivisionError:
                     metric_value = 0.0  # Handle edge case
                 # Log test metrics with tensorboard
-                tb_logger.add_scalar(f"Test/{label}_{metric_name}", metric_value)
+                # tb_logger.add_scalar(f"Test/{label}_{metric_name}", metric_value)
                 # Log test metrics with wandb
-                wandb.log({'f"Test/{metric_name}"': metric_value})
+                # wandb.log({'f"Test/{metric_name}"': metric_value})
                 print(f"Test {label} {metric_name}: {metric_value}")
+
+        for metric_name, metric in self.test_metrics_multilabel.items():
+            try:
+                metric_value = metric.compute()
+            except ZeroDivisionError:
+                metric_value = 0.0
+            # tb_logger.add_scalar(f"Test/{metric_name}", metric_value)
+            # wandb.log({f"Test/{metric_name}": metric_value})
 
             # TODO Test metrics computation and logging: Done
             # Analogous to validation metrics just use self.test_metrics: Done
