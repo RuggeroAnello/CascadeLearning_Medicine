@@ -4,6 +4,7 @@ import torchvision
 import os
 import wandb
 import torch.nn.functional as F
+import numpy as np
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -29,6 +30,7 @@ class TwoStageModel(torch.nn.Module):
         model_ap_pa_classification: str,
         model_ap: str,
         model_pa: str,
+        targets: dict,
         **kwargs,
     ):
         """
@@ -43,6 +45,8 @@ class TwoStageModel(torch.nn.Module):
         super().__init__()
         # Set device
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.labels = targets.keys()
+        self.unique_labels = None
 
         # Set hyperparameters
         if "batch_size" in params:
@@ -76,24 +80,37 @@ class TwoStageModel(torch.nn.Module):
 
         metrics = params.get("metrics", [])
 
-        # Accuracy is always calculated
-        self.val_metrics["accuracy"] = (
-            BinaryAccuracy()
-        )  # These do NOT accept the confidence_threshold as argument -> done in validation_step
-        self.test_metrics["accuracy"] = BinaryAccuracy()
+        threshold = params.get("confidence_threshold", 0.5)
 
-        if "precision" in metrics:
-            self.val_metrics["precision"] = BinaryPrecision()
-            self.test_metrics["precision"] = BinaryPrecision()
-        if "recall" in metrics:
-            self.val_metrics["recall"] = BinaryRecall()
-            self.test_metrics["recall"] = BinaryRecall()
-        if "f1" in metrics:
-            self.val_metrics["f1"] = BinaryF1Score()
-            self.test_metrics["f1"] = BinaryF1Score()
-        if "auc" in metrics:
-            self.val_metrics["auc"] = BinaryAUROC()
-            self.test_metrics["auc"] = BinaryAUROC()
+        for label in self.labels:
+            self.val_metrics[label] = {}
+            self.test_metrics[label] = {}
+
+            # Accuracy is always calculated
+            self.val_metrics[label]["accuracy"] = BinaryAccuracy(threshold=threshold)
+            self.test_metrics[label]["accuracy"] = BinaryAccuracy(threshold=threshold)
+
+            if "precision" in metrics:
+                self.val_metrics[label]["precision"] = BinaryPrecision(
+                    threshold=threshold
+                )
+                self.test_metrics[label]["precision"] = BinaryPrecision(
+                    threshold=threshold
+                )
+            if "recall" in metrics:
+                self.val_metrics[label]["recall"] = BinaryRecall(threshold=threshold)
+                self.test_metrics[label]["recall"] = BinaryRecall(threshold=threshold)
+            if "f1" in metrics:
+                self.val_metrics[label]["f1"] = BinaryF1Score(threshold=threshold)
+                self.test_metrics[label]["f1"] = BinaryF1Score(threshold=threshold)
+            if "auc" in metrics:
+                self.val_metrics[label]["auc"] = BinaryAUROC(threshold=threshold)
+                self.test_metrics[label]["auc"] = BinaryAUROC(threshold=threshold)
+
+    def set_labels(self, labels):
+        self.labels = labels  # Set labels from dataset
+        self.unique_labels = np.unique(self.labels)
+        print(f"Model labels: {self.unique_labels}")
 
     def _configure_hyperparameters(self, params):
         self.lr = params.get("lr", 1e-3)
@@ -168,15 +185,17 @@ class TwoStageModel(torch.nn.Module):
         # Activate the outputs to get the predictions
         outputs = torch.sigmoid(outputs).squeeze()
 
-        predictions = (outputs > self.confidence_threshold).long()
-
         # Update metrics
-        for metric_name, metric in metrics.items():
-            # TODO (for the future): doesn't work for multiclass
-            # TODO check what input is needed for the metrics
-            # if metric_name == "accuracy":
-            #    metric.update(outputs, labels.squeeze().long())
-            metric.update(predictions, labels.squeeze().long())  # Ensure labels are 1D
+        for i, label in enumerate(self.labels):
+            for _, metric in metrics[label].items():
+                if len(self.labels) == 1:
+                    labels_metric = labels.squeeze().int()
+                    outputs_metric = outputs.squeeze()
+                    metric.update(outputs_metric, labels_metric)
+                else:
+                    labels_metric = labels[:, i].squeeze().int()
+                    outputs_metric = outputs[:, i]
+                    metric.update(outputs_metric, labels_metric)  # Ensure labels are 1D
 
         return loss
 
@@ -199,23 +218,45 @@ class TwoStageModel(torch.nn.Module):
             ncols=200,
         )
 
+        test_loss = 0.0
+
         with torch.no_grad():
-            for metric in self.test_metrics.values():
-                metric.reset()
+            for label in self.test_metrics.keys():
+                for metric in self.test_metrics[label].values():
+                    metric.reset()
             for test_iteration, batch in enumerate(test_loop):
                 # Perform the test step and accumulate the loss
-                _ = self._validation_step(
+                loss = self._validation_step(
                     batch,
                     self.test_metrics,
                     self.loss_fn,
                 )
+                test_loss += loss.item()
+
+                # Update progress bar
+                test_loop.set_postfix(
+                    test_loss=f"{test_loss / (test_iteration + 1):.6f}",
+                )
+
+        # Average test loss over the entire dataset
+        test_loss /= len(test_loader)
+
+        if tb_logger:
+            tb_logger.add_scalar("Test/loss", test_loss)  # Log test loss
+
+        # Log test loss with wandb
+        wandb.log({"test_loss": test_loss})
+        print(f"Test loss: {test_loss}")
 
         # Compute and log test metrics
-        for metric_name, metric in self.test_metrics.items():
-            try:
-                metric_value = metric.compute()
-            except ZeroDivisionError:
-                metric_value = 0.0  # Handle edge case
-            tb_logger.add_scalar(f"Test/{metric_name}", metric_value)  # Log metrics
-            wandb.log({'f"Test/{metric_name}"': metric_value})
-            print(f"Test {metric_name}: {metric_value}")
+        for label in self.test_metrics.keys():
+            for metric_name, metric in self.test_metrics[label].items():
+                try:
+                    metric_value = metric.compute()
+                except ZeroDivisionError:
+                    metric_value = 0.0  # Handle edge case
+                # Log test metrics with tensorboard
+                tb_logger.add_scalar(f"Test/{label}_{metric_name}", metric_value)
+                # Log test metrics with wandb
+                wandb.log({'f"Test/{metric_name}"': metric_value})
+                print(f"Test {label} {metric_name}: {metric_value}")
