@@ -338,7 +338,7 @@ class AbstractOneStageModel(torch.nn.Module):
                     epoch * len(train_loader) + train_iteration,
                 )
                 # Log training loss with wandb
-                wandb.log({"epoch": epoch, "train_loss": loss.item()})
+                #   wandb.log({"epoch": epoch, "train_loss": loss.item()})
 
             scheduler.step()
 
