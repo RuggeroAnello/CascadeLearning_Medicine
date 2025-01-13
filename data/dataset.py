@@ -21,8 +21,8 @@ class CheXpertDataset(Dataset):
         csv_file: str,
         root_dir: str,
         targets: dict,
-        uncertainty_mapping: dict,
         transform: transforms.Compose = None,
+        uncertainty_mapping: bool = True
     ):
         """
         Initializes the CheXpert Dataset.
@@ -31,23 +31,26 @@ class CheXpertDataset(Dataset):
             csv_file (str): Path to the csv file with annotations.
             root_dir (str): Directory where CheXpert images are stored.
             targets (dict): Dictionary of target labels.
-            uncertainty_mapping (dict): Dictionary specifying how to handle uncertain values (-1) for each column.
-                                        E.g., {"Cardiomegaly": 1, "No Finding": 0}.
+            uncertainty_mapping (bool): If True, maps uncertain labels (-1) based on column name.
+                                        If False, keeps original values.
             transform (transforms.Compose, optional): Optional transform for images.
         """
         self.data = pd.read_csv(csv_file)
         self.root_dir = root_dir
         self.transform = transform
-        self.uncertainty_mapping = uncertainty_mapping
         self.targets = targets
+        self.uncertainty_mapping = uncertainty_mapping
 
         # Extract target columns
-        target_columns = [self.data.columns[i] for i in self.targets.values()]
+        target_columns = [list(self.data.columns)[idx] for idx in self.targets.values()]
 
-        # Apply column-specific handling of uncertain values (-1)
-        for column in target_columns:
-            if column in self.uncertainty_mapping.keys():
-                self.data[column] = self.data[column].replace([-1, -1.0], self.uncertainty_mapping[column])
+        # Only apply uncertainty mapping if uncertainty_mapping is True
+        if uncertainty_mapping:
+            for column in target_columns:
+                if column.lower() in ['edema', 'atelectasis', 'pleural_effusion']:
+                    self.data[column] = self.data[column].replace([-1, -1.0], 1)
+                else:
+                    self.data[column] = self.data[column].replace([-1, -1.0], 0)
                 
         # Extract labels
         self.labels = self.data[target_columns].values.astype(int)
@@ -61,18 +64,11 @@ class CheXpertDataset(Dataset):
     def __getitem__(self, idx):
         # Load image
         img_path = os.path.join(self.root_dir, self.data.iloc[idx, 0])
-
         # Load image
         img = Image.open(img_path)
-
-
         if self.transform:
             img = self.transform(img)
-
         # Load dict with selected target labels
-        samples = np.zeros(len(self.targets))
-        for i, key in enumerate(self.targets.values()):
-            samples[i] = self.data.iloc[idx, key]
-
+        samples = self.labels[idx].astype(np.float64)
         # Ensure the labels are a 1D array
         return img, samples
