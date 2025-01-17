@@ -387,7 +387,7 @@ class AbstractOneStageModel(torch.nn.Module):
                             f"Val/{label}_{metric_name}", metric_value, epoch
                         )
                     # Log validation metrics with wandb
-                    wandb.log({f"Val/{metric_name}_{label}": metric_value})
+                    wandb.log({f"Val/{label}_{metric_name}": metric_value})
 
             for metric_name, metric in self.val_metrics_multilabel.items():
                 try:
@@ -469,7 +469,7 @@ class AbstractOneStageModel(torch.nn.Module):
                 if tb_logger:
                     tb_logger.add_scalar(f"Test/{label}_{metric_name}", metric_value)
                 # Log test metrics with wandb
-                wandb.log({f"Test/{metric_name}_{label}": metric_value})
+                wandb.log({f"Test/{label}_{metric_name}": metric_value})
                 print(f"Test {label} {metric_name}: {metric_value}")
 
         for metric_name, metric in self.test_metrics_multilabel.items():
