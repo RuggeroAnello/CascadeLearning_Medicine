@@ -313,6 +313,6 @@ with wandb.init(project=model_type, config=params, dir='./logs/wandb'):
     model.save_hparams(path)
 
     # Train the model
-    model.train(train_dataset, val_dataset, tb_logger, path)
+    model.train(train_dataset, val_dataset, tb_logger, path, log_wandb=True)
 
     torch.save(model, os.path.join(path, "model.pth"))
