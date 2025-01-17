@@ -87,47 +87,12 @@ class AbstractMultiStageModel(torch.nn.Module):
                 self.val_metrics[label]["auroc"] = BinaryAUROC()
                 self.test_metrics[label]["auroc"] = BinaryAUROC()
             if "auc" in metrics:
-<<<<<<< HEAD
-                self.val_metrics[label]["auc"] = AUC()
-                self.test_metrics[label]["auc"] = AUC()
-            if "confusion_matrix" in metrics:
-                self.val_metrics[label]["confusion_matrix"] = BinaryConfusionMatrix()
-                self.test_metrics[label]["confusion_matrix"] = BinaryConfusionMatrix()
-        if len(self.labels) > 1:
-            if "multilabel_accuracy" in metrics:
-                self.val_metrics_multilabel["multilabel_accuracy"] = MultilabelAccuracy(
-                    threshold=threshold
-                )
-                self.test_metrics_multilabel["multilabel_accuracy"] = (
-                    MultilabelAccuracy(threshold=threshold)
-                )
-            if "multilabel_auprc" in metrics:
-                self.val_metrics_multilabel["multilabel_auprc"] = MultilabelAUPRC(
-                    num_labels=len(self.labels)
-                )
-                self.test_metrics_multilabel["multilabel_auprc"] = MultilabelAUPRC(
-                    num_labels=len(self.labels)
-                )
-            if "multilabel_precision_recall_curve" in metrics:
-                self.val_metrics_multilabel["multilabel_precision_recall_curve"] = (
-                    MultilabelPrecisionRecallCurve(num_labels=len(self.labels))
-                )
-                self.test_metrics_multilabel["multilabel_precision_recall_curve"] = (
-                    MultilabelPrecisionRecallCurve(num_labels=len(self.labels))
-                )
-    
-    def set_labels(self, labels):
-        self.labels = labels  # Set labels from dataset
-        self.unique_labels = np.unique(self.labels)
-        print(f"Model labels: {self.unique_labels}")
-=======
                 self.val_metrics[label]["auc"] = BinaryAUROC(threshold=threshold)
                 self.test_metrics[label]["auc"] = BinaryAUROC(threshold=threshold)
 
     def _configure_hyperparameters(self, params: dict):
         """
         Configure the hyperparameters for the model.
->>>>>>> main
 
         Args:
             params (dict): Dictionary containing the hyperparameters.
@@ -311,7 +276,7 @@ class AbstractMultiStageModel(torch.nn.Module):
                     tb_logger.add_scalar(f"Test/{label}_{metric_name}", metric_value)
                 # Log test metrics with wandb
                 if log_wandb:
-                    wandb.log({'f"Test/{metric_name}"': metric_value})
+                    wandb.log({f"Test/{metric_name}": metric_value})
                 print(f"Test {label} {metric_name}: {metric_value}")
 
 
