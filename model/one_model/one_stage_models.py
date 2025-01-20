@@ -419,14 +419,15 @@ class AbstractOneStageModel(torch.nn.Module):
                     #    f"Val/{label}_{metric_name}", metric_value, epoch
                     # )
                     # Log validation metrics with wandb
-                    wandb.log({f"Val/{metric_name}": metric_value})
+                    wandb.log({f"Val/{metric_name}_{label}": metric_value})
 
             for metric_name, metric in self.val_metrics_multilabel.items():
                 try:
                     metric_value = metric.compute()
                 except ZeroDivisionError:
                     metric_value = 0.0
-                # tb_logger.add_scalar(f"Val/{metric_name}", metric_value, epoch)
+                if tb_logger:
+                    tb_logger.add_scalar(f"Val/{metric_name}", metric_value, epoch)
                 wandb.log({f"Val/{metric_name}": metric_value})
 
             # Save model at specified intervals
@@ -497,9 +498,11 @@ class AbstractOneStageModel(torch.nn.Module):
                 except ZeroDivisionError:
                     metric_value = 0.0  # Handle edge case
                 # Log test metrics with tensorboard
-                # tb_logger.add_scalar(f"Test/{label}_{metric_name}", metric_value)
+                if tb_logger:
+                    tb_logger.add_scalar(f"Test/{label}_{metric_name}", metric_value)
                 # Log test metrics with wandb
-                wandb.log({'f"Test/{metric_name}"': metric_value})
+                wandb.log({f"Test/{metric_name}_{label}": metric_value})
+
                 print(f"Test {label} {metric_name}: {metric_value}")
 
         for metric_name, metric in self.test_metrics_multilabel.items():
@@ -507,7 +510,8 @@ class AbstractOneStageModel(torch.nn.Module):
                 metric_value = metric.compute()
             except ZeroDivisionError:
                 metric_value = 0.0
-            # tb_logger.add_scalar(f"Test/{metric_name}", metric_value)
+            if tb_logger:
+                tb_logger.add_scalar(f"Test/{metric_name}", metric_value)
             wandb.log({f"Test/{metric_name}": metric_value})
 
             # TODO Test metrics computation and logging: Done
@@ -561,10 +565,10 @@ class ResNet50OneStage(AbstractOneStageModel):
         self.model.to(self.device)
 
     def forward(self, x):
-        self.model = self.model.to(
-            self.device
-        )  # Ensure the entire model is on the correct device
-        x = x.to(self.device)
+        # self.model = self.model.to(
+        #    self.device
+        # )  # Ensure the entire model is on the correct device
+        # x = x.to(self.device)
         return self.model(x)
 
     @property

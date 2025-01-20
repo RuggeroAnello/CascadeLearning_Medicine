@@ -64,11 +64,15 @@ class CheXpertDataset(Dataset):
     def __getitem__(self, idx):
         # Load image
         img_path = os.path.join(self.root_dir, self.data.iloc[idx, 0])
+
         # Load image
         img = Image.open(img_path)
+
         if self.transform:
             img = self.transform(img)
+
         # Load dict with selected target labels
         samples = self.labels[idx].astype(np.float64)
+
         # Ensure the labels are a 1D array
         return img, samples
