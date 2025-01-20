@@ -11,6 +11,11 @@ from torcheval.metrics import (
     BinaryF1Score,
     BinaryAccuracy,
     BinaryAUROC,
+    AUC,
+    MultilabelAccuracy,
+    MultilabelAUPRC,
+    MultilabelPrecisionRecallCurve,
+    BinaryConfusionMatrix,
 )
 
 
@@ -49,6 +54,9 @@ class AbstractMultiStageModel(torch.nn.Module):
         # TODO: Add more metrics if needed
         self.val_metrics = {}
         self.test_metrics = {}
+        
+        self.val_metrics_multilabel = {}
+        self.test_metrics_multilabel = {}
 
         metrics = params.get("metrics", [])
 
@@ -75,6 +83,9 @@ class AbstractMultiStageModel(torch.nn.Module):
             if "f1" in metrics:
                 self.val_metrics[label]["f1"] = BinaryF1Score(threshold=threshold)
                 self.test_metrics[label]["f1"] = BinaryF1Score(threshold=threshold)
+            if "auroc" in metrics:
+                self.val_metrics[label]["auroc"] = BinaryAUROC()
+                self.test_metrics[label]["auroc"] = BinaryAUROC()
             if "auc" in metrics:
                 self.val_metrics[label]["auc"] = BinaryAUROC(threshold=threshold)
                 self.test_metrics[label]["auc"] = BinaryAUROC(threshold=threshold)
@@ -187,6 +198,10 @@ class AbstractMultiStageModel(torch.nn.Module):
                     outputs_metric = outputs[:, i]
                     metric.update(outputs_metric, labels_metric)
 
+        # Update multilabel metrics
+        for _, metric in self.val_metrics_multilabel.items():
+            metric.update(outputs, labels)
+
         return loss
 
     def test(self, test_dataset, tb_logger=None, log_wandb=True):
@@ -222,6 +237,8 @@ class AbstractMultiStageModel(torch.nn.Module):
             for label in self.test_metrics.keys():
                 for metric in self.test_metrics[label].values():
                     metric.reset()
+            for metric in self.test_metrics_multilabel.values():
+                metric.reset()
             for test_iteration, batch in enumerate(test_loop):
                 # Perform the test step and accumulate the loss
                 loss = self._validation_step(
@@ -259,7 +276,7 @@ class AbstractMultiStageModel(torch.nn.Module):
                     tb_logger.add_scalar(f"Test/{label}_{metric_name}", metric_value)
                 # Log test metrics with wandb
                 if log_wandb:
-                    wandb.log({'f"Test/{metric_name}"': metric_value})
+                    wandb.log({f"Test/{label}_{metric_name}": metric_value})
                 print(f"Test {label} {metric_name}: {metric_value}")
 
 
