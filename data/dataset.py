@@ -53,7 +53,7 @@ class CheXpertDataset(Dataset):
                     self.data[column] = self.data[column].replace([-1, -1.0], 0)
                 
         # Extract labels
-        self.labels = self.data[target_columns].values.astype(int)
+        self.labels = self.data[target_columns].values
 
         # Find unique labels
         self.unique_labels = np.unique(self.labels)

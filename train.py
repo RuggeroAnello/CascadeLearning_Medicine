@@ -75,7 +75,7 @@ params = {
     "lr": 1e-4,
     "save_epoch": 5,
     "batch_size": 128,
-    "num_epochs": 50,
+    "num_epochs": 100,
     "use_weighted_sampler": True,
     "label_smoothing": 0.2,
     # "num_labels": 1,
@@ -85,7 +85,9 @@ params = {
     # BCE with Sigmoid activation function
     "loss_fn": "torch.nn.BCEWithLogitsLoss()",
     # For multilabel: MultiLabelSoftMarginLoss
-    "metrics": ["accuracy", "f1_score", "precision", "recall", "confusion_matrix", "auc", "auroc", "multilabel_accuracy", "multilabel_auprc", "multilabel_precision_recall_curve"],
+    "metrics": ["accuracy", "f1_score", "precision", 
+                "recall", "confusion_matrix", "auc", "auroc",
+                "multilabel_accuracy", "multilabel_auprc", "multilabel_precision_recall_curve"],
     "confidence_threshold": 0.5,
 }
 
@@ -134,7 +136,7 @@ if model_type == "one_stage_baseline":
     "consolidation": 11,
     # "pneumonia": 12,
     "atelectasis": 13,
-    #"pneumothorax": 14,
+    # "pneumothorax": 14,
     "pleural_effusion": 15,
     # "pleural_other": 16,
     # "fracture": 17,
@@ -178,11 +180,11 @@ elif model_type == "two_stage_second_ap":
     "consolidation": 11,
     # "pneumonia": 12,
     "atelectasis": 13,
-    #"pneumothorax": 14,
+    # "pneumothorax": 14,
     "pleural_effusion": 15,
     # "pleural_other": 16,
     # "fracture": 17,
-    #"support_devices": 18,
+    # "support_devices": 18,
     # "ap/pa map": 22,
 } 
 elif model_type == "two_stage_second_pa":
@@ -315,6 +317,6 @@ with wandb.init(project=model_type, config=params, dir='./logs/wandb'):
     model.save_hparams(path)
 
     # Train the model
-    model.train(train_dataset, val_dataset, tb_logger, path)
+    model.train(train_dataset, val_dataset, tb_logger, path, log_wandb=True)
 
     torch.save(model, os.path.join(path, "model.pth"))
