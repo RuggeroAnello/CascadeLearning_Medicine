@@ -13,7 +13,9 @@
 # - Select the train and valid set
 # - Define the task that is trained
 
-print("Started training script")
+training_name = "ENTER_TRAINING_DESCRIPTION"
+
+print("Started training script.")
 
 # Argument parser
 import argparse
@@ -305,7 +307,7 @@ with wandb.init(project=model_type, config=params, dir='./logs/wandb'):
     else:
         num_of_runs = len(os.listdir(path))
     path = os.path.join(
-        path, f"run_{num_of_runs:03d}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+        path, f"{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_{model_type}_{training_name}"
     )
     os.makedirs(path)
 
@@ -319,4 +321,4 @@ with wandb.init(project=model_type, config=params, dir='./logs/wandb'):
     # Train the model
     model.train(train_dataset, val_dataset, tb_logger, path, log_wandb=True)
 
-    torch.save(model, os.path.join(path, "model.pth"))
+print("Finished training script.")
