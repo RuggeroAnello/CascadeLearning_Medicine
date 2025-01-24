@@ -1,5 +1,6 @@
 {
     "model_type": "one_stage_baseline",
+    "training_name": "ENTER_TRAINING_DESCRIPTION",
     "task": "one_stage_multi_wrd_ls",
     "paths": {
         "data_root_dir": "../image_data/",

@@ -13,12 +13,49 @@
 # - Select the train and valid set
 # - Define the task that is trained
 
-training_name = "ENTER_TRAINING_DESCRIPTION"
-
 print("Started training script.")
 
-# Argument parser
+from model.one_model.one_stage_models import ResNet50OneStage, ResNet18OneStage
+from data.dataset import CheXpertDataset
+
+import torch
+import torchvision.transforms as transforms
+from torch.utils.tensorboard import SummaryWriter
+import wandb
+
+from datetime import datetime
+from pathlib import Path
 import argparse
+import json
+import os
+
+print("\nImported all libraries")
+
+def preprocess_params(params_dict):
+    for params_key, params_value in params_dict.items():
+        if params_key == 'transform':
+            for transform_key, transform_value in params_value.items():
+                if type(transform_value) == list:
+                    params_dict[params_key][transform_key] = tuple(transform_value)
+        else:
+            if type(params_value) == list:
+                params_dict[params_key] = tuple(params_value)
+    return params_dict
+
+def read_json_config(file_path):
+    with open(file_path, "r") as file:
+        json_data = json.load(file)
+
+    model_type = json_data['model_type']
+    task = json_data['task']
+    paths = json_data['paths']
+    targets = json_data['targets']
+    params = json_data['params']
+    params = preprocess_params(params)
+    
+    return model_type, task, paths, targets, params
+
+# Argument parser
 parser = argparse.ArgumentParser(description="Train a model with different configurations.")
 parser.add_argument(
     "--model_type",
@@ -29,20 +66,20 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
-print("Start importing libraries")
-import os
-from datetime import datetime
+json_config_path = Path.cwd().joinpath("configs", "config_one_stage_baseline.json")
 
-import torch
-import torchvision.transforms as transforms
-from torch.utils.tensorboard import SummaryWriter
+if args.model_type == "one_stage_baseline":
+    json_config_path = Path.cwd().joinpath("configs", "config_one_stage_baseline.json")
+elif args.model_type == "two_stage_first":
+    json_config_path = Path.cwd().joinpath("configs", "config_two_stage_first.json")
+elif args.model_type == "two_stage_second_ap":
+    json_config_path = Path.cwd().joinpath("configs", "config_two_stage_second_ap.json")
+elif args.model_type == "two_stage_second_pa":
+    json_config_path = Path.cwd().joinpath("configs", "config_two_stage_second_pa.json")
+else:
+    raise ValueError("Invalid model type specified.")
 
-from model.one_model.one_stage_models import ResNet50OneStage, ResNet18OneStage
-from data.dataset import CheXpertDataset
-
-import wandb
-
-print("\nImported all libaries")
+model_type, task, paths, targets, params = read_json_config(json_config_path)
 
 # Set variable based on argument
 if args.model_type == "one_stage_baseline":
