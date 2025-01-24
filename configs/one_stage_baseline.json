@@ -14,7 +14,7 @@
         "pleural_effusion": 15
     },
     "params": {
-        "transfrom": {
+        "transform": {
             "resize": [
                 256,
                 256
