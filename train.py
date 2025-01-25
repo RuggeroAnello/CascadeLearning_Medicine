@@ -84,7 +84,7 @@ params = {
     "lr": 1e-4,
     "save_epoch": 5,
     "batch_size": 128,
-    "num_epochs": 100,
+    "num_epochs": 3,
     "use_weighted_sampler": True,
     "label_smoothing": 0.2,
     # "num_labels": 1,
@@ -136,21 +136,28 @@ if model_type == "one_stage_baseline":
     # "age": 2,
     # "frontal/lateral": 3,
     # "ap/pa": 4,
-    # "no_finding": 5,
-    # "enlarged_cardiomediastinum": 6,
+    "no_finding": 5,
+    "enlarged_cardiomediastinum": 6,
     "cardiomegaly": 7,
-    # "lung_opacity": 8,
-    # "lung_lesion": 9,
+    "lung_opacity": 8,
+    "lung_lesion": 9,
     "edema": 10,
     "consolidation": 11,
-    # "pneumonia": 12,
+    "pneumonia": 12,
     "atelectasis": 13,
-    # "pneumothorax": 14,
+    "pneumothorax": 14,
     "pleural_effusion": 15,
+<<<<<<< HEAD
     # "pleural_other": 16,
     # "fracture": 17,
     # "support_devices": 18,
     # "ap/pa map": 21,
+=======
+    "pleural_other": 16,
+    "fracture": 17,
+    "support_devices": 18,
+    "ap/pa map": 22,
+>>>>>>> d091d6c (Cluster rug_dev updated)
 }
 elif model_type == "two_stage_first":
     targets = {
