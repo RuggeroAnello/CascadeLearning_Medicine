@@ -27,6 +27,12 @@ parser.add_argument(
     required=True,
     help="Specify the type of model to train."
 )
+parser.add_argument(
+    "--weights_path",
+    type=str,
+    default=None,
+    help="Path to custom pre-trained weights (optional)."
+)
 args = parser.parse_args()
 
 print("Start importing libraries")
@@ -252,38 +258,48 @@ assert len(train_dataset.labels) == len(
     train_dataset
 ), "Mismatch between targets and dataset size!"
 
+# Set default weights path based on model type
+if args.weights_path is None:
+    if model_type == "one_stage_baseline":
+        default_weights = "IMAGENET1K_V2"  # For ResNet50 used in one_stage_baseline
+    else:
+        default_weights = "IMAGENET1K_V1"  # For other models like two_stage_first, second_ap, second_pa
+else:
+    default_weights = args.weights_path  # Use custom weights if provided
+
 with wandb.init(project=model_type, config=params, dir='./logs/wandb'):
-    # 3: CHANGE HERE FOR DIFFERENT MODEL
+    # 3: CREATE MODEL BASED ON MODEL TYPE AND PASS DEFAULT OR CUSTOM WEIGHTS
     if model_type == "one_stage_baseline":
         model = ResNet50OneStage(
             params=params,
-            targets = targets,
-            # num_labels=params["num_labels"],
+            targets=targets,
             input_channels=params["input_channels"],
+            weights=default_weights  # Pass the default or custom weights
         )
     elif model_type == "two_stage_first":
         model = ResNet18OneStage(
             params=params,
-            targets = targets,
-            # num_labels=params["num_labels"],
+            targets=targets,
             input_channels=params["input_channels"],
+            weights=default_weights  # Pass the default or custom weights
         )
     elif model_type == "two_stage_second_ap":
         model = ResNet18OneStage(
             params=params,
-            targets = targets,
-            # num_labels=params["num_labels"],
+            targets=targets,
             input_channels=params["input_channels"],
+            weights=default_weights  # Pass the default or custom weights
         )
     elif model_type == "two_stage_second_pa":
         model = ResNet18OneStage(
             params=params,
-            targets = targets,
-            # num_labels=params["num_labels"],
+            targets=targets,
             input_channels=params["input_channels"],
+            weights=default_weights  # Pass the default or custom weights
         )
     else:
         raise ValueError("Invalid model type specified.")
+    
     
     # wandb.watch(model, log="all")
 
