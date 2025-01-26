@@ -47,6 +47,7 @@ def read_json_config(file_path):
         json_data = json.load(file)
 
     model_type = json_data['model_type']
+    training_name = json_data['training_name']
     task = json_data['task']
     paths = json_data['paths']
     targets = json_data['targets']
@@ -54,7 +55,7 @@ def read_json_config(file_path):
     params = preprocess_params(params)
     params_transform = params['params_transform']
     
-    return model_type, task, paths, targets, params, params_transform
+    return model_type, training_name, task, paths, targets, params, params_transform
 # Argument parser
 parser = argparse.ArgumentParser(description="Train a model with different configurations.")
 parser.add_argument(
@@ -69,17 +70,17 @@ args = parser.parse_args()
 json_config_path = Path.cwd().joinpath("configs", "config_one_stage_baseline.json")
 
 if args.model_type == "one_stage_baseline":
-    json_config_path = Path.cwd().joinpath("configs", "config_one_stage_baseline.json")
+    json_config_path = Path.cwd().joinpath("train_configs", "config_one_stage_baseline.json")
 elif args.model_type == "two_stage_first":
-    json_config_path = Path.cwd().joinpath("configs", "config_two_stage_first.json")
+    json_config_path = Path.cwd().joinpath("train_configs", "config_two_stage_first.json")
 elif args.model_type == "two_stage_second_ap":
-    json_config_path = Path.cwd().joinpath("configs", "config_two_stage_second_ap.json")
+    json_config_path = Path.cwd().joinpath("train_configs", "config_two_stage_second_ap.json")
 elif args.model_type == "two_stage_second_pa":
-    json_config_path = Path.cwd().joinpath("configs", "config_two_stage_second_pa.json")
+    json_config_path = Path.cwd().joinpath("train_configs", "config_two_stage_second_pa.json")
 else:
     raise ValueError("Invalid model type specified.")
 
-model_type, task, paths, targets, params, params_transform = read_json_config(json_config_path)
+model_type, training_name, task, paths, targets, params, params_transform = read_json_config(json_config_path)
 
 # To prevent the kernel from dying.
 os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
@@ -115,15 +116,15 @@ val_transform = transforms.Compose(
 )
 
 train_dataset = CheXpertDataset(
-    csv_file=train_csv_file_path,
-    root_dir="../image_data/",
+    csv_file=paths["train_csv_file_path"],
+    root_dir=paths["data_root_dir"],
     targets=targets,
     transform=transform,
     uncertainty_mapping=True
 )
 val_dataset = CheXpertDataset(
-    csv_file=val_csv_file_path,
-    root_dir="../image_data/",
+    csv_file=paths["val_csv_file_path"],
+    root_dir=paths["data_root_dir"],
     targets=targets,
     transform=val_transform,
     uncertainty_mapping=True
