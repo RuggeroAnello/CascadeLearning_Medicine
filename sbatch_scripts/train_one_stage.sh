@@ -12,8 +12,8 @@
 # - python command at the end
 
 #SBATCH --job-name=one_stage_pred_sup-dev
-#SBATCH --output=/vol/aimspace/projects/practical_WS2425/cascade_learning/slurm_out/one_stage_pred_sup-dev-%A.out  # Standard output of the script (Can be absolute or relative path). %A adds the job id to the file name so you can launch the same script multiple times and get different logging files
-#SBATCH --error=/vol/aimspace/projects/practical_WS2425/cascade_learning/slurm_out/one_stage_pred_sup-dev-%A.err  # Standard error of the script
+#SBATCH --output=/vol/miltank/projects/practical_WS2425/cascade_learning/slurm_out/one_stage_pred_sup-dev-%A.out  # Standard output of the script (Can be absolute or relative path). %A adds the job id to the file name so you can launch the same script multiple times and get different logging files
+#SBATCH --error=/vol/miltank/projects/practical_WS2425/cascade_learning/slurm_out/one_stage_pred_sup-dev-%A.err  # Standard error of the script
 #SBATCH --time=2-12:00:00  # Limit on the total run time (format: days-hours:minutes:seconds)
 #SBATCH --gres=gpu:1  # Number of GPUs if needed
 #SBATCH --cpus-per-task=24  # Number of CPUs (Don't use more than 24 per GPU)

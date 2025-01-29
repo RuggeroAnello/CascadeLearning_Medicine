@@ -13,7 +13,10 @@
 # - Select the train and valid set
 # - Define the task that is trained
 
-training_name = "ENTER_TRAINING_DESCRIPTION"
+import torch
+import torchvision.transforms as transforms
+
+training_name = "5LabPA_NoPretraining_Best_100epochs"
 
 print("Started training script.")
 
@@ -39,9 +42,7 @@ print("Start importing libraries")
 import os
 from datetime import datetime
 
-import torch
-import torchvision.transforms as transforms
-from torch.utils.tensorboard import SummaryWriter
+# from torch.utils.tensorboard import SummaryWriter
 
 from model.one_model.one_stage_models import ResNet50OneStage, ResNet18OneStage
 from data.dataset import CheXpertDataset
@@ -149,7 +150,7 @@ if model_type == "one_stage_baseline":
     # "pleural_other": 16,
     # "fracture": 17,
     # "support_devices": 18,
-    # "ap/pa map": 22,
+    # "ap/pa map": 21,
 }
 elif model_type == "two_stage_first":
     targets = {
@@ -171,7 +172,7 @@ elif model_type == "two_stage_first":
     # "pleural_other": 16,
     # "fracture": 17,
     # "support_devices": 18,
-    "ap/pa map": 22,
+    "ap/pa map": 21,
     }
 elif model_type == "two_stage_second_ap":
     targets = {
@@ -193,7 +194,7 @@ elif model_type == "two_stage_second_ap":
     # "pleural_other": 16,
     # "fracture": 17,
     # "support_devices": 18,
-    # "ap/pa map": 22,
+    # "ap/pa map": 21,
 } 
 elif model_type == "two_stage_second_pa":
     targets = {
@@ -215,7 +216,7 @@ elif model_type == "two_stage_second_pa":
     # "pleural_other": 16,
     # "fracture": 17,
     # "support_devices": 18,
-    # "ap/pa map": 22,
+    # "ap/pa map": 21,
 }
 else:
     raise ValueError("Invalid model type specified.")
