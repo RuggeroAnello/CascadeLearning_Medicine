@@ -137,7 +137,7 @@ assert len(train_dataset.labels) == len(
     train_dataset
 ), "Mismatch between targets and dataset size!"
 
-with wandb.init(project=model_type, config=params, dir='./logs/wandb'):
+with wandb.init(name=training_name, project=model_type, config=params, dir='./logs/wandb'):
     if model_type == "one_stage_baseline":
         model = ResNet50OneStage(
             params=params,
