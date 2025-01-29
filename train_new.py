@@ -1,35 +1,7 @@
-# NOTE: the base structure of this script can be used to train:
-# - the model of the one stage baseline
-# - The first model of the two stage cascading model
-# - The two models of the second stage of the cascading model
+# NOTE: Use the argument parser to specify the path to the JSON config file for your trining.
+# Run "python train.py --help" to see the options.
 
-# Use the argument parser to specify the model type
-# run "python train.py --help" to see the options
-
-# It is indicated with "CHANGE HERE FOR DIFFERENT MODEL" in the
-# code what can be changed:
-# - Select target for the training
-# - Specify model that is used
-# - Select the train and valid set
-# - Define the task that is trained
-
-print("Started training script.")
-
-from model.one_model.one_stage_models import ResNet50OneStage, ResNet18OneStage
-from data.dataset import CheXpertDataset
-
-import torch
-import torchvision.transforms as transforms
-from torch.utils.tensorboard import SummaryWriter
-import wandb
-
-from datetime import datetime
-from pathlib import Path
 import argparse
-import json
-import os
-
-print("\nImported all libraries")
 
 def preprocess_params(params_dict):
     for params_key, params_value in params_dict.items():
@@ -56,30 +28,35 @@ def read_json_config(file_path):
     params_transform = params['params_transform']
     
     return model_type, training_name, task, paths, targets, params, params_transform
+
 # Argument parser
 parser = argparse.ArgumentParser(description="Train a model with different configurations.")
 parser.add_argument(
-    "--model_type",
+    "--config_path",
     type=str,
-    choices=["one_stage_baseline", "two_stage_first", "two_stage_second_ap", "two_stage_second_pa"],
     required=True,
-    help="Specify the type of model to train."
+    help="Specify the path (relative to the personalize_ml repository's root directory) to the JSON config file for your training."
 )
 args = parser.parse_args()
 
-json_config_path = Path.cwd().joinpath("configs", "config_one_stage_baseline.json")
+print("Started training script.")
 
-if args.model_type == "one_stage_baseline":
-    json_config_path = Path.cwd().joinpath("train_configs", "config_one_stage_baseline.json")
-elif args.model_type == "two_stage_first":
-    json_config_path = Path.cwd().joinpath("train_configs", "config_two_stage_first.json")
-elif args.model_type == "two_stage_second_ap":
-    json_config_path = Path.cwd().joinpath("train_configs", "config_two_stage_second_ap.json")
-elif args.model_type == "two_stage_second_pa":
-    json_config_path = Path.cwd().joinpath("train_configs", "config_two_stage_second_pa.json")
-else:
-    raise ValueError("Invalid model type specified.")
+from model.one_model.one_stage_models import ResNet50OneStage, ResNet18OneStage
+from data.dataset import CheXpertDataset
 
+import torch
+import torchvision.transforms as transforms
+from torch.utils.tensorboard import SummaryWriter
+import wandb
+
+from datetime import datetime
+from pathlib import Path
+import json
+import os
+
+print("\nImported all libraries")
+
+json_config_path = Path.cwd().joinpath(args.config_path)
 model_type, training_name, task, paths, targets, params, params_transform = read_json_config(json_config_path)
 
 # To prevent the kernel from dying.
