@@ -21,5 +21,9 @@
 export PYTHONUNBUFFERED=true
 
 # Run the training script
+<<<<<<< HEAD
 python train_new.py --config_path train_configs/config_two_stage_second_pa.json
                                            
+=======
+python train_new.py --config_path train_configs/config_two_stage_second_pa.json
+>>>>>>> 2a61afa (Updated sbatch_scripts)

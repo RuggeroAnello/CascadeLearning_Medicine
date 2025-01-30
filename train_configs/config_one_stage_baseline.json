@@ -1,6 +1,6 @@
 {
     "model_type": "one_stage_baseline",
-    "training_name": "ResNet18 PreTraining 5Lab",
+    "training_name": "5Label_OS",
     "task": "one_stage_multi_wrs_ls",
     "paths": {
         "data_root_dir": "../image_data/",
