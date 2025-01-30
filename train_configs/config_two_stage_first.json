@@ -47,6 +47,8 @@
             ]
         },
         "lr": 1e-4,
+        "lr_decay_gamma": 0.9,
+        "lr_decay_period": 2,
         "save_epoch": 5,
         "batch_size": 128,
         "num_epochs": 100,
