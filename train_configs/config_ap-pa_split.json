@@ -1,14 +1,14 @@
 {
     "model_type": "two_stage_first",
-    "training_name": "ENTER_TRAINING_DESCRIPTION",
+    "training_name": "ap-pa_split_lr_5e-5",
     "task": "first_stage_pred_ap-pa",
     "paths": {
         "data_root_dir": "../image_data/",
-        "train_csv_file_path": "./data/splitted/train.csv",
-        "val_csv_file_path": "./data/splitted/valid.csv"
+        "train_csv_file_path": "../rugdev_Personalized_ML/data/splitted/train.csv",
+        "val_csv_file_path": "../rugdev_Personalized_ML/data/splitted/valid.csv"
     },
     "targets": {
-        "ap/pa map": 22
+        "ap/pa map": 21
     },
     "params": {
         "params_transform": {
@@ -46,7 +46,7 @@
                 1.25
             ]
         },
-        "lr": 1e-4,
+        "lr": 5e-5,
         "lr_decay_gamma": 0.9,
         "lr_decay_period": 2,
         "save_epoch": 5,
