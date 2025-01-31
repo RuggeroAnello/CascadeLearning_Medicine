@@ -23,11 +23,12 @@ def read_json_config(file_path):
     task = json_data['task']
     paths = json_data['paths']
     targets = json_data['targets']
+    weights = json_data['weights']
     params = json_data['params']
     params = preprocess_params(params)
     params_transform = params['params_transform']
     
-    return model_type, training_name, task, paths, targets, params, params_transform
+    return model_type, training_name, task, paths, targets, weights, params, params_transform
 
 # Argument parser
 parser = argparse.ArgumentParser(description="Train a model with different configurations.")
@@ -38,7 +39,6 @@ parser.add_argument(
     help="Specify the path (relative to the personalize_ml repository's root directory) to the JSON config file for your training."
 )
 args = parser.parse_args()
-
 print("Started training script.")
 
 from model.one_model.one_stage_models import ResNet50OneStage, ResNet18OneStage
@@ -57,7 +57,7 @@ import os
 print("\nImported all libraries")
 
 json_config_path = Path.cwd().joinpath(args.config_path)
-model_type, training_name, task, paths, targets, params, params_transform = read_json_config(json_config_path)
+model_type, training_name, task, paths, weights, targets, params, params_transform = read_json_config(json_config_path)
 
 # To prevent the kernel from dying.
 os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
@@ -120,12 +120,14 @@ with wandb.init(name=training_name, project=model_type, config=params, dir='./lo
             params=params,
             targets = targets,
             input_channels=params["input_channels"],
+            weights=weights
         )
     elif model_type == "two_stage_first" or model_type == "two_stage_second_ap" or model_type == "two_stage_second_pa":
         model = ResNet18OneStage(
             params=params,
             targets = targets,
             input_channels=params["input_channels"],
+            weights=weights
         )
     else:
         raise ValueError("Invalid model type specified.")

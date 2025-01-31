@@ -10,6 +10,7 @@
     "targets": {
         "ap/pa map": 22
     },
+    "weights": "IMAGENET1K_V1",
     "params": {
         "params_transform": {
             "resize": [
