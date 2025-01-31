@@ -57,7 +57,7 @@ import os
 print("\nImported all libraries")
 
 json_config_path = Path.cwd().joinpath(args.config_path)
-model_type, training_name, task, paths, weights, targets, params, params_transform = read_json_config(json_config_path)
+model_type, training_name, task, paths, targets, weights, params, params_transform = read_json_config(json_config_path)
 
 # To prevent the kernel from dying.
 os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
@@ -116,7 +116,7 @@ assert len(train_dataset.labels) == len(
 
 with wandb.init(name=training_name, project=model_type, config=params, dir='./logs/wandb'):
     if model_type == "one_stage_baseline":
-        model = ResNet50OneStage(
+        model = ResNet18OneStage(
             params=params,
             targets = targets,
             input_channels=params["input_channels"],

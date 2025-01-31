@@ -8,7 +8,7 @@
         "val_csv_file_path": "./data/splitted/valid.csv"
     },
     "targets": {
-        "ap/pa map": 22
+        "ap/pa map": 21
     },
     "weights": "IMAGENET1K_V1",
     "params": {

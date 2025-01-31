@@ -21,9 +21,4 @@
 export PYTHONUNBUFFERED=true
 
 # Run the training script
-<<<<<<< HEAD
 python train_new.py --config_path train_configs/config_one_stage_baseline.json
-                                           
-=======
-python train_new.py --config_path train_configs/config_one_stage_baseline.json
->>>>>>> 2a61afa (Updated sbatch_scripts)

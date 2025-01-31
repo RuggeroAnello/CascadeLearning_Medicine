@@ -147,17 +147,10 @@ if model_type == "one_stage_baseline":
     "atelectasis": 13,
     "pneumothorax": 14,
     "pleural_effusion": 15,
-<<<<<<< HEAD
     # "pleural_other": 16,
     # "fracture": 17,
     # "support_devices": 18,
     # "ap/pa map": 21,
-=======
-    "pleural_other": 16,
-    "fracture": 17,
-    "support_devices": 18,
-    "ap/pa map": 22,
->>>>>>> d091d6c (Cluster rug_dev updated)
 }
 elif model_type == "two_stage_first":
     targets = {
