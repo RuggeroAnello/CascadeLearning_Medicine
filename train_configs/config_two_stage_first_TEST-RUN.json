@@ -1,18 +1,14 @@
 {
-    "model_type": "two_stage_second_pa",
-    "training_name": "ENTER_TRAINING_DESCRIPTION",
-    "task": "second_stage_pa_multi_wrs_ls",
+    "model_type": "two_stage_first",
+    "training_name": "TEST_RUN",
+    "task": "first_stage_pred_ap-pa",
     "paths": {
         "data_root_dir": "../image_data/",
-        "train_csv_file_path": "./data/splitted/pa_train.csv",
-        "val_csv_file_path": "./data/splitted/pa_valid.csv"
+        "train_csv_file_path": "./data/splitted/train.csv",
+        "val_csv_file_path": "./data/splitted/valid.csv"
     },
     "targets": {
-        "cardiomegaly": 7,
-        "edema": 10,
-        "consolidation": 11,
-        "atelectasis": 13,
-        "pleural_effusion": 15
+        "ap/pa map": 22
     },
     "params": {
         "params_transform": {
@@ -55,7 +51,7 @@
         "lr_decay_period": 2,
         "save_epoch": 5,
         "batch_size": 128,
-        "num_epochs": 100,
+        "num_epochs": 4,
         "use_weighted_sampler": true,
         "label_smoothing": 0.2,
         "input_channels": 1,
