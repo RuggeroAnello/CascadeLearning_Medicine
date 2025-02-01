@@ -15,6 +15,7 @@
         "pleural_effusion": 15
     },
     "weights": "IMAGENET1K_V1",
+    "//": "As per weights, use pretraining.pth, IMAGENET1K_V2 if ResNet50, IMAGENET1K_V1 if ResNet18",
     "params": {
         "params_transform": {
             "resize": [

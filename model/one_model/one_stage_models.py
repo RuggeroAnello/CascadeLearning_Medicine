@@ -553,7 +553,7 @@ class ResNet50OneStage(AbstractOneStageModel):
 
         # Load pretrained model
         # Best available weights (currently alias for IMAGENET1K_V2)
-        self.model = torchvision.models.resnet50(weights="IMAGENET1K_V2").to(
+        self.model = torchvision.models.resnet50().to(
             self.device
         )
 
@@ -610,7 +610,7 @@ class ResNet18OneStage(AbstractOneStageModel):
         )
 
         # Load pretrained model
-        self.model = torchvision.models.resnet18(weights="IMAGENET1K_V1")
+        self.model = torchvision.models.resnet18()
 
         # Adapt input size of model to the image channels
         if input_channels != 3:
@@ -667,7 +667,7 @@ class ResNet34OneStage(AbstractOneStageModel):
         )
 
         # Load pretrained model
-        self.model = torchvision.models.resnet34(weights="IMAGENET1K_V1").to(
+        self.model = torchvision.models.resnet34().to(
             self.device
         )
 

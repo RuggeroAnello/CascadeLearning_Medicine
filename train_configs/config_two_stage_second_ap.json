@@ -1,6 +1,6 @@
 {
     "model_type": "two_stage_second_ap",
-    "training_name": "ENTER_TRAINING_DESCRIPTION",
+    "training_name": "5LabAP_w/Pretraining",
     "task": "second_stage_ap_multi_wrs_ls",
     "paths": {
         "data_root_dir": "../image_data/",
@@ -14,7 +14,8 @@
         "atelectasis": 13,
         "pleural_effusion": 15
     },
-    "weights": "IMAGENET1K_V1",
+    "weights": "pretraining.pth",
+    "//": "As per weights, use pretraining.pth, IMAGENET1K_V2 if ResNet50, IMAGENET1K_V1 if ResNet18",
     "params": {
         "params_transform": {
             "resize": [
@@ -51,12 +52,12 @@
                 1.25
             ]
         },
-        "lr": 1e-4,
+        "lr": 0.00001,
         "lr_decay_gamma": 0.9,
         "lr_decay_period": 2,
         "save_epoch": 5,
         "batch_size": 128,
-        "num_epochs": 100,
+        "num_epochs": 50,
         "use_weighted_sampler": true,
         "label_smoothing": 0.2,
         "input_channels": 1,
