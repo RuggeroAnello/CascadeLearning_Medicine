@@ -1,6 +1,7 @@
 import os
 import pandas as pd
-import numpy as np
+import numpy as np 
+import torch 
 from torch.utils.data import Dataset
 from torchvision import transforms
 from PIL import Image
@@ -21,7 +22,7 @@ class CheXpertDataset(Dataset):
         root_dir: str,
         targets: dict,
         transform: transforms.Compose = None,
-        handle_uncertainty: str = "remove",  # Options: 'remove', 'zero', 'one'
+        uncertainty_mapping: bool = True
     ):
         """
         Initializes the CheXpert Dataset.
@@ -30,29 +31,27 @@ class CheXpertDataset(Dataset):
             csv_file (str): Path to the csv file with annotations.
             root_dir (str): Directory where CheXpert images are stored.
             targets (dict): Dictionary of target labels.
+            uncertainty_mapping (bool): If True, maps uncertain labels (-1) based on column name.
+                                        If False, keeps original values.
             transform (transforms.Compose, optional): Optional transform for images.
-            handle_uncertainty (str): How to handle -1 labels: 'remove', 'zero', or 'one'.
         """
         self.data = pd.read_csv(csv_file)
         self.root_dir = root_dir
         self.transform = transform
         self.targets = targets
-        self.handle_uncertainty = handle_uncertainty
+        self.uncertainty_mapping = uncertainty_mapping
 
         # Extract target columns
-        target_columns = [self.data.columns[i] for i in self.targets.values()]
+        target_columns = [list(self.data.columns)[idx] for idx in self.targets.values()]
 
-        # Handle uncertain (-1) labels
-        if self.handle_uncertainty == "remove":
-            self.data = self.data[
-                self.data[target_columns].apply(lambda row: (row != -1.0).all(), axis=1)
-            ]
-        elif self.handle_uncertainty in ["zero", "one"]:
-            replace_value = 0 if self.handle_uncertainty == "zero" else 1
-            self.data[target_columns] = self.data[target_columns].replace(
-                -1.0, replace_value
-            )
-
+        # Only apply uncertainty mapping if uncertainty_mapping is True
+        if uncertainty_mapping:
+            for column in target_columns:
+                if column.lower() in ['edema', 'atelectasis', 'pleural_effusion']:
+                    self.data[column] = self.data[column].replace([-1, -1.0], 1)
+                else:
+                    self.data[column] = self.data[column].replace([-1, -1.0], 0)
+                
         # Extract labels
         self.labels = self.data[target_columns].values
 

@@ -1,10 +1,17 @@
 import torch
 import json
-import os
-import wandb
+import torchvision
+import torch.nn.functional as F
+import numpy as np
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-
+from model.one_model.one_stage_models import (
+    ResNet50OneStage,
+    ResNet18OneStage,
+    ResNet34OneStage,
+)
+import os
+import wandb
 from torcheval.metrics import (
     BinaryRecall,
     BinaryPrecision,
@@ -37,7 +44,6 @@ class AbstractMultiStageModel(torch.nn.Module):
         # Set device
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.labels = targets.keys()
-        self.unique_labels = None
 
         # Set hyperparameters
         self.params = params
@@ -54,6 +60,9 @@ class AbstractMultiStageModel(torch.nn.Module):
         # TODO: Add more metrics if needed
         self.val_metrics = {}
         self.test_metrics = {}
+        
+        self.val_metrics_multilabel = {}
+        self.test_metrics_multilabel = {}
 
         self.val_metrics_multilabel = {}
         self.test_metrics_multilabel = {}
@@ -114,18 +123,21 @@ class AbstractMultiStageModel(torch.nn.Module):
                 self.test_metrics_multilabel["multilabel_precision_recall_curve"] = (
                     MultilabelPrecisionRecallCurve(num_labels=len(self.labels))
                 )
+<<<<<<< HEAD
+=======
+    
+    def set_labels(self, labels):
+        self.labels = labels  # Set labels from dataset
+        self.unique_labels = np.unique(self.labels)
+        print(f"Model labels: {self.unique_labels}")
+>>>>>>> main
 
-    def _configure_hyperparameters(self, params: dict):
-        """
-        Configure the hyperparameters for the model.
-
-        Args:
-            params (dict): Dictionary containing the hyperparameters.
-        """
+    def _configure_hyperparameters(self, params):
         self.lr = params.get("lr", 1e-3)
         self.batch_size = params.get("batch_size", 32)
         self.num_epochs = params.get("num_epochs", 10)
         self.optimizer_name = params.get("optimizer", "adam")
+        self.label_smoothing = params.get("label_smoothing", 0.2)
         # Map string loss function names to actual loss function classes
         loss_fn_str = params.get("loss_fn", "BCEWithLogitsLoss")
         loss_fn_mapping = {
@@ -298,7 +310,7 @@ class AbstractMultiStageModel(torch.nn.Module):
                     tb_logger.add_scalar(f"Test/{label}_{metric_name}", metric_value)
                 # Log test metrics with wandb
                 if log_wandb:
-                    wandb.log({'f"Test/{metric_name}"': metric_value})
+                    wandb.log({f"Test/{label}_{metric_name}": metric_value})
                 print(f"Test {label} {metric_name}: {metric_value}")
 
 

@@ -13,7 +13,9 @@
 # - Select the train and valid set
 # - Define the task that is trained
 
-print("Started training script")
+training_name = "ENTER_TRAINING_DESCRIPTION"
+
+print("Started training script.")
 
 # Argument parser
 import argparse
@@ -76,17 +78,22 @@ params = {
     "save_epoch": 5,
     "batch_size": 128,
     "num_epochs": 100,
-    "num_labels": 1,
+    "use_weighted_sampler": True,
+    "label_smoothing": 0.2,
+    # "num_labels": 1,
     "input_channels": 1,
     "optimizer": "adam",
+    "num_workers": 22,
     # BCE with Sigmoid activation function
     "loss_fn": "torch.nn.BCEWithLogitsLoss()",
     # For multilabel: MultiLabelSoftMarginLoss
-    "metrics": ["accuracy", "precision", "recall"],
+    "metrics": ["accuracy", "f1_score", "precision", 
+                "recall", "confusion_matrix", "auc", "auroc",
+                "multilabel_accuracy", "multilabel_auprc", "multilabel_precision_recall_curve"],
     "confidence_threshold": 0.5,
 }
 
-transform = transforms.Compose(squeue 
+transform = transforms.Compose( 
     [
         transforms.Resize(params_transform["resize"]),
         transforms.ToTensor(),
@@ -124,18 +131,18 @@ if model_type == "one_stage_baseline":
     # "ap/pa": 4,
     # "no_finding": 5,
     # "enlarged_cardiomediastinum": 6,
-    # "cardiomegaly": 7,
+    "cardiomegaly": 7,
     # "lung_opacity": 8,
     # "lung_lesion": 9,
-    # "edema": 10,
-    # "consolidation": 11,
+    "edema": 10,
+    "consolidation": 11,
     # "pneumonia": 12,
-    # "atelectasis": 13,
+    "atelectasis": 13,
     # "pneumothorax": 14,
-    # "pleural_effusion": 15,
+    "pleural_effusion": 15,
     # "pleural_other": 16,
     # "fracture": 17,
-    "support_devices": 18,
+    # "support_devices": 18,
     # "ap/pa map": 22,
 }
 elif model_type == "two_stage_first":
@@ -168,18 +175,18 @@ elif model_type == "two_stage_second_ap":
     # "ap/pa": 4,
     # "no_finding": 5,
     # "enlarged_cardiomediastinum": 6,
-    # "cardiomegaly": 7,
+    "cardiomegaly": 7,
     # "lung_opacity": 8,
     # "lung_lesion": 9,
-    # "edema": 10,
-    # "consolidation": 11,
+    "edema": 10,
+    "consolidation": 11,
     # "pneumonia": 12,
-    # "atelectasis": 13,
+    "atelectasis": 13,
     # "pneumothorax": 14,
-    # "pleural_effusion": 15,
+    "pleural_effusion": 15,
     # "pleural_other": 16,
     # "fracture": 17,
-    "support_devices": 18,
+    # "support_devices": 18,
     # "ap/pa map": 22,
 } 
 elif model_type == "two_stage_second_pa":
@@ -190,18 +197,18 @@ elif model_type == "two_stage_second_pa":
     # "ap/pa": 4,
     # "no_finding": 5,
     # "enlarged_cardiomediastinum": 6,
-    # "cardiomegaly": 7,
+    "cardiomegaly": 7,
     # "lung_opacity": 8,
     # "lung_lesion": 9,
-    # "edema": 10,
-    # "consolidation": 11,
+    "edema": 10,
+    "consolidation": 11,
     # "pneumonia": 12,
-    # "atelectasis": 13,
+    "atelectasis": 13,
     # "pneumothorax": 14,
-    # "pleural_effusion": 15,
+    "pleural_effusion": 15,
     # "pleural_other": 16,
     # "fracture": 17,
-    "support_devices": 18,
+    # "support_devices": 18,
     # "ap/pa map": 22,
 }
 else:
@@ -215,11 +222,11 @@ elif model_type == "two_stage_first":
     train_csv_file_path = "./data/splitted/train.csv"
     val_csv_file_path = "./data/splitted/valid.csv"
 elif model_type == "two_stage_second_ap":
-    train_csv_file_path = "data/splitted/ap_train.csv"
-    val_csv_file_path = "data/splitted/ap_valid.csv"
+    train_csv_file_path = "./data/splitted/ap_train.csv"
+    val_csv_file_path = "./data/splitted/ap_valid.csv"
 elif model_type == "two_stage_second_pa":
-    train_csv_file_path = "data/splitted/pa_train.csv"
-    val_csv_file_path = "data/splitted/pa_valid.csv"
+    train_csv_file_path = "./data/splitted/pa_train.csv"
+    val_csv_file_path = "./data/splitted/pa_valid.csv"
 else:
     raise ValueError("Invalid model type specified.")
 
@@ -228,12 +235,14 @@ train_dataset = CheXpertDataset(
     root_dir="../image_data/",
     targets=targets,
     transform=transform,
+    uncertainty_mapping=True
 )
 val_dataset = CheXpertDataset(
     csv_file=val_csv_file_path,
     root_dir="../image_data/",
     targets=targets,
     transform=val_transform,
+    uncertainty_mapping=True
 )
 
 print(f"Train dataset size: {len(train_dataset)}")
@@ -248,39 +257,39 @@ with wandb.init(project=model_type, config=params, dir='./logs/wandb'):
     if model_type == "one_stage_baseline":
         model = ResNet50OneStage(
             params=params,
-            num_labels=params["num_labels"],
+            targets = targets,
+            # num_labels=params["num_labels"],
             input_channels=params["input_channels"],
         )
     elif model_type == "two_stage_first":
         model = ResNet18OneStage(
             params=params,
-            num_labels=params["num_labels"],
+            targets = targets,
+            # num_labels=params["num_labels"],
             input_channels=params["input_channels"],
         )
     elif model_type == "two_stage_second_ap":
         model = ResNet18OneStage(
             params=params,
-            num_labels=params["num_labels"],
+            targets = targets,
+            # num_labels=params["num_labels"],
             input_channels=params["input_channels"],
         )
     elif model_type == "two_stage_second_pa":
         model = ResNet18OneStage(
             params=params,
-            num_labels=params["num_labels"],
+            targets = targets,
+            # num_labels=params["num_labels"],
             input_channels=params["input_channels"],
         )
     else:
         raise ValueError("Invalid model type specified.")
     
-    wandb.watch(model, log="all")
-    
-    model.set_labels(train_dataset.labels)
-
-    # TODO: Put set_labels as a parameter of the Model
+    # wandb.watch(model, log="all")
 
     # 4: CHANGE HERE FOR DIFFERENT MODEL
     if model_type == "one_stage_baseline":
-        task = "one_stage_pred_sup-dev"
+        task = "one_stage_multi_wrs_ls"
     elif model_type == "two_stage_first":
         task = "first_stage_pred_ap-pa"
     elif model_type == "two_stage_second_ap":
@@ -298,17 +307,18 @@ with wandb.init(project=model_type, config=params, dir='./logs/wandb'):
     else:
         num_of_runs = len(os.listdir(path))
     path = os.path.join(
-        path, f"run_{num_of_runs:03d}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+        path, f"{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_{model_type}_{training_name}"
     )
     os.makedirs(path)
 
     # Create tensorboard logger
-    tb_logger = SummaryWriter(path)
+    # tb_logger = SummaryWriter(path)
+    tb_logger = None
 
     # Save the model parameters
     model.save_hparams(path)
 
     # Train the model
-    model.train(train_dataset, val_dataset, tb_logger, path)
+    model.train(train_dataset, val_dataset, tb_logger, path, log_wandb=True)
 
-    torch.save(model, os.path.join(path, "model.pth"))
+print("Finished training script.")
