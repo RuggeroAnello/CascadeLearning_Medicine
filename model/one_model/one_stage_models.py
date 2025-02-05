@@ -392,7 +392,7 @@ class AbstractOneStageModel(torch.nn.Module):
                 for label in self.val_metrics.keys():
                     for metric in self.val_metrics[label].values():
                         metric.reset()
-                for metric in self.test_metrics_multilabel.values():
+                for metric in self.val_metrics_multilabel.values():
                     metric.reset()
                 for val_iteration, batch in enumerate(val_loop):
                     loss = self._validation_step(batch, self.val_metrics, loss_fn)
