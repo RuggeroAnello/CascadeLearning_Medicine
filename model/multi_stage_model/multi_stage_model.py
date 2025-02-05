@@ -1,3 +1,4 @@
+import pandas as pd
 import torch
 import json
 import torchvision
@@ -24,6 +25,7 @@ from torcheval.metrics import (
     MultilabelPrecisionRecallCurve,
     BinaryConfusionMatrix,
 )
+from torchmetrics.classification import MultilabelMatthewsCorrCoef
 
 
 class AbstractMultiStageModel(torch.nn.Module):
@@ -60,7 +62,7 @@ class AbstractMultiStageModel(torch.nn.Module):
         # TODO: Add more metrics if needed
         self.val_metrics = {}
         self.test_metrics = {}
-        
+
         self.val_metrics_multilabel = {}
         self.test_metrics_multilabel = {}
 
@@ -123,14 +125,15 @@ class AbstractMultiStageModel(torch.nn.Module):
                 self.test_metrics_multilabel["multilabel_precision_recall_curve"] = (
                     MultilabelPrecisionRecallCurve(num_labels=len(self.labels))
                 )
-<<<<<<< HEAD
-=======
-    
-    def set_labels(self, labels):
-        self.labels = labels  # Set labels from dataset
-        self.unique_labels = np.unique(self.labels)
-        print(f"Model labels: {self.unique_labels}")
->>>>>>> main
+            if "mcc" in metrics:
+                self.val_metrics_multilabel["mcc"] = MultilabelMatthewsCorrCoef(
+                    num_labels=len(self.labels), threshold=threshold
+                )
+                self.test_metrics_multilabel["mcc"] = MultilabelMatthewsCorrCoef(
+                    num_labels=len(self.labels), threshold=threshold
+                )
+                self.val_metrics_multilabel["mcc"].to(self.device)
+                self.test_metrics_multilabel["mcc"].to(self.device)
 
     def _configure_hyperparameters(self, params):
         self.lr = params.get("lr", 1e-3)
@@ -196,7 +199,7 @@ class AbstractMultiStageModel(torch.nn.Module):
         """
         self.params = json.load(open(path, "r"))
 
-    def _validation_step(self, batch, metrics, loss_fn):
+    def _validation_step(self, batch, metrics, multilabel_metrics, loss_fn):
         """
         Perform a single validation step.
 
@@ -233,12 +236,18 @@ class AbstractMultiStageModel(torch.nn.Module):
                     metric.update(outputs_metric, labels_metric)
 
         # Update multilabel metrics
-        for _, metric in self.val_metrics_multilabel.items():
-            metric.update(outputs, labels)
+        for name, metric in multilabel_metrics.items():
+            if name == "mcc":
+                metric.update(outputs, labels.to(torch.int64))
+            else:
+                metric.update(outputs, labels)
 
         return loss
 
-    def test(self, test_dataset, tb_logger=None, log_wandb=True):
+    def _set_model_to_eval():
+        raise NotImplementedError
+
+    def test(self, test_dataset, name, tb_logger=None, log_wandb=False):
         """
         Test the model on the given dataset.
 
@@ -254,9 +263,7 @@ class AbstractMultiStageModel(torch.nn.Module):
             num_workers=self.num_workers,
         )
 
-        self.model_ap_pa_classification.eval()
-        self.model_ap.eval()
-        self.model_pa.eval()
+        self._set_model_to_eval()
 
         test_loop = tqdm(
             test_loader,
@@ -278,6 +285,7 @@ class AbstractMultiStageModel(torch.nn.Module):
                 loss = self._validation_step(
                     batch,
                     self.test_metrics,
+                    self.test_metrics_multilabel,
                     self.loss_fn,
                 )
                 test_loss += loss.item()
@@ -298,6 +306,10 @@ class AbstractMultiStageModel(torch.nn.Module):
             wandb.log({"test_loss": test_loss})
         print(f"Test loss: {test_loss}")
 
+        # Append to result["name"] the name
+        res = pd.DataFrame()
+        res["name"] = [name]
+
         # Compute and log test metrics
         for label in self.test_metrics.keys():
             for metric_name, metric in self.test_metrics[label].items():
@@ -312,6 +324,25 @@ class AbstractMultiStageModel(torch.nn.Module):
                 if log_wandb:
                     wandb.log({f"Test/{label}_{metric_name}": metric_value})
                 print(f"Test {label} {metric_name}: {metric_value}")
+                res[f"{label}_{metric_name}"] = [f"{metric_value}"]
+
+        for metric_name, metric in self.test_metrics_multilabel.items():
+            try:
+                metric_value = metric.compute()
+            except ZeroDivisionError:
+                metric_value = 0.0
+            if tb_logger:
+                tb_logger.add_scalar(f"Test/{metric_name}", metric_value)
+            # Log test multilabel test metrics with wandb
+            if log_wandb:
+                wandb.log({f"Test/{metric_name}": metric_value})
+
+            # TODO Test metrics computation and logging: Done
+            # Analogous to validation metrics just use self.test_metrics: Done
+            print(f"Test {metric_name}: {metric_value}")
+            res[metric_name] = [f"{metric_value}"]
+
+        return res
 
 
 class TwoStageModelAPPA(AbstractMultiStageModel):
@@ -367,6 +398,14 @@ class TwoStageModelAPPA(AbstractMultiStageModel):
         self.params["model_ap"] = model_ap
         self.params["model_pa"] = model_pa
 
+    def _set_model_to_eval(self):
+        """
+        Set all models to evaluation mode.
+        """
+        self.model_ap_pa_classification.eval()
+        self.model_ap.eval()
+        self.model_pa.eval()
+
     def forward(self, x):
         """
         Forward pass of the two-stage model.
@@ -379,7 +418,7 @@ class TwoStageModelAPPA(AbstractMultiStageModel):
         """
         out_stage_one = self.model_ap_pa_classification(x)
         conf = torch.sigmoid(out_stage_one)
-        pred = conf > self.confidence_threshold_first_ap_pa
+        pred = conf < self.confidence_threshold_first_ap_pa
 
         idx_ap = pred.squeeze().nonzero(as_tuple=True)[0]
         idx_pa = (~pred.squeeze()).nonzero(as_tuple=True)[0]
@@ -472,7 +511,7 @@ class TwoStageModelFrontalLateral(AbstractMultiStageModel):
         """
         out_stage_one = self.model_frontal_lateral_classification(x)
         conf = torch.sigmoid(out_stage_one)
-        pred = conf > self.confidence_threshold_first_frontal_lateral
+        pred = conf < self.confidence_threshold_first_frontal_lateral
 
         idx_frontal = pred.squeeze().nonzero(as_tuple=True)[0]
         idx_lateral = (~pred.squeeze()).nonzero(as_tuple=True)[0]
@@ -495,6 +534,14 @@ class TwoStageModelFrontalLateral(AbstractMultiStageModel):
             output[idx_lateral] = out_lateral
 
         return output
+
+    def _set_model_to_eval(self):
+        """
+        Set all models to evaluation mode.
+        """
+        self.model_frontal_lateral_classification.eval()
+        self.model_frontal.eval()
+        self.model_lateral.eval()
 
     @property
     def name(self):
@@ -569,6 +616,16 @@ class ThreeStageModelFrontalLateralAPPA(AbstractMultiStageModel):
         self.params["model_frontal_pa"] = model_frontal_pa
         self.params["model_lateral"] = model_lateral
 
+    def _set_model_to_eval(self):
+        """
+        Set all models to evaluation mode.
+        """
+        self.model_frontal_lateral_classification.eval()
+        self.model_frontal_ap_pa_classification.eval()
+        self.model_frontal_ap.eval()
+        self.model_frontal_pa.eval()
+        self.model_lateral.eval()
+
     def forward(self, x):
         """
         Forward pass of the two-stage model.
@@ -583,27 +640,27 @@ class ThreeStageModelFrontalLateralAPPA(AbstractMultiStageModel):
         # First stage: frontal-lateral classification
         out_frontal_lateral = self.model_frontal_lateral_classification(x)
         conf = torch.sigmoid(out_frontal_lateral)
-        pred = conf > self.confidence_threshold_frontal_lateral
+        pred = conf < self.confidence_threshold_frontal_lateral
 
         idx_frontal = pred.squeeze().nonzero(as_tuple=True)[0]
         idx_lateral = (~pred.squeeze()).nonzero(as_tuple=True)[0]
 
         x_frontal = x[idx_frontal]
-        x_lateral = x[idx_lateral]
 
         # Second stage: frontal AP-PA classification
         out_frontal_ap_pa = self.model_frontal_ap_pa_classification(x_frontal)
         conf = torch.sigmoid(out_frontal_ap_pa)
-        pred = conf > self.confidence_threshold_frontal_ap_pa
+        pred = conf < self.confidence_threshold_frontal_ap_pa
 
         idx_ap = pred.squeeze().nonzero(as_tuple=True)[0]
         idx_pa = (~pred.squeeze()).nonzero(as_tuple=True)[0]
 
-        # TODO: Check if the indices are correct
-        x_ap = x_frontal[idx_frontal[idx_ap]]
-        x_pa = x_frontal[idx_frontal[idx_pa]]
+        x_ap = x[idx_frontal[idx_ap]]
+        x_pa = x[idx_frontal[idx_pa]]
+        x_lateral = x[idx_lateral]
 
         # Final stage: classification
+        # TODO some outputs are empty!!
         out_ap = self.model_frontal_ap(x_ap) if x_ap.size(0) > 0 else None
         out_pa = self.model_frontal_pa(x_pa) if x_pa.size(0) > 0 else None
         out_lateral = self.model_lateral(x_lateral) if x_lateral.size(0) > 0 else None
@@ -617,10 +674,11 @@ class ThreeStageModelFrontalLateralAPPA(AbstractMultiStageModel):
             if out_ap is not None
             else out_pa.size(1),
         ).to(self.device)
+
         if out_ap is not None:
-            output[idx_ap] = out_ap
+            output[idx_frontal[idx_ap]] = out_ap
         if out_pa is not None:
-            output[idx_pa] = out_pa
+            output[idx_frontal[idx_pa]] = out_pa
         if out_lateral is not None:
             output[idx_lateral] = out_lateral
 
