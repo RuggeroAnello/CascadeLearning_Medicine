@@ -116,6 +116,7 @@ assert len(train_dataset.labels) == len(
 
 with wandb.init(name=training_name, project=model_type, config=params, dir='./logs/wandb'):
     if model_type == "one_stage_baseline":
+        # For Pretraining, switch ResNet50 with ResNet18
         model = ResNet50OneStage(
             params=params,
             targets = targets,
