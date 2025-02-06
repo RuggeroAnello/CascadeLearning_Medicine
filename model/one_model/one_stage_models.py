@@ -80,6 +80,8 @@ class AbstractOneStageModel(torch.nn.Module):
         self.save_epoch = params.get("save_epoch", 1)
         self.confidence_threshold = params.get("confidence_threshold", 0.5)
         self.num_workers = params.get("num_workers", 22)
+        self.lr_decay_gamma = params.get("lr_decay_gamma", 0.9)
+        self.lr_decay_period = params.get("lr_decay_period", 2)
 
     def _configure_metrics(self, params):
         # TODO: Add more metrics if needed
@@ -332,7 +334,7 @@ class AbstractOneStageModel(torch.nn.Module):
 
         optimizer = self._configure_optimizer()
         scheduler = torch.optim.lr_scheduler.StepLR(
-            optimizer, step_size=int(len(train_loader) / 5), gamma=0.7
+            optimizer, step_size=int(len(train_loader)*self.lr_decay_period), gamma=self.lr_decay_gamma
         )
         loss_fn = self.loss_fn  # Use the loss function configured in the model
 
