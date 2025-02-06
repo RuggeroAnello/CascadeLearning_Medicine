@@ -164,4 +164,7 @@ cython_debug/
 *.pth
 *pt
 
+# Track models in final_model folder
+!final_models/*.pth
+
 wandb/
