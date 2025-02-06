@@ -1,6 +1,6 @@
 {
     "model_type": "one_stage_baseline",
-    "training_name": "ENTER_TRAINING_DESCRIPTION",
+    "training_name": "ResNet18 PreTraining 5Lab",
     "task": "one_stage_multi_wrs_ls",
     "paths": {
         "data_root_dir": "../image_data/",
@@ -14,6 +14,8 @@
         "atelectasis": 13,
         "pleural_effusion": 15
     },
+    "weights": "IMAGENET1K_V2",
+    "//": "As per weights, use pretraining.pth, IMAGENET1K_V2 if ResNet50, IMAGENET1K_V1 if ResNet18",
     "params": {
         "params_transform": {
             "resize": [
@@ -50,12 +52,12 @@
                 1.25
             ]
         },
-        "lr": 1e-4,
+        "lr": 0.0001,
         "lr_decay_gamma": 0.9,
         "lr_decay_period": 2,
         "save_epoch": 5,
         "batch_size": 128,
-        "num_epochs": 100,
+        "num_epochs": 50,
         "use_weighted_sampler": true,
         "label_smoothing": 0.2,
         "input_channels": 1,

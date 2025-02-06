@@ -13,7 +13,10 @@
 # - Select the train and valid set
 # - Define the task that is trained
 
-training_name = "ENTER_TRAINING_DESCRIPTION"
+import torch
+import torchvision.transforms as transforms
+
+training_name = "5LabPA_NoPretraining_Best_100epochs"
 
 print("Started training script.")
 
@@ -27,15 +30,19 @@ parser.add_argument(
     required=True,
     help="Specify the type of model to train."
 )
+parser.add_argument(
+    "--weights_path",
+    type=str,
+    default=None,
+    help="Path to custom pre-trained weights (optional)."
+)
 args = parser.parse_args()
 
 print("Start importing libraries")
 import os
 from datetime import datetime
 
-import torch
-import torchvision.transforms as transforms
-from torch.utils.tensorboard import SummaryWriter
+# from torch.utils.tensorboard import SummaryWriter
 
 from model.one_model.one_stage_models import ResNet50OneStage, ResNet18OneStage
 from data.dataset import CheXpertDataset
@@ -77,7 +84,7 @@ params = {
     "lr": 1e-4,
     "save_epoch": 5,
     "batch_size": 128,
-    "num_epochs": 100,
+    "num_epochs": 3,
     "use_weighted_sampler": True,
     "label_smoothing": 0.2,
     # "num_labels": 1,
@@ -129,21 +136,21 @@ if model_type == "one_stage_baseline":
     # "age": 2,
     # "frontal/lateral": 3,
     # "ap/pa": 4,
-    # "no_finding": 5,
-    # "enlarged_cardiomediastinum": 6,
+    "no_finding": 5,
+    "enlarged_cardiomediastinum": 6,
     "cardiomegaly": 7,
-    # "lung_opacity": 8,
-    # "lung_lesion": 9,
+    "lung_opacity": 8,
+    "lung_lesion": 9,
     "edema": 10,
     "consolidation": 11,
-    # "pneumonia": 12,
+    "pneumonia": 12,
     "atelectasis": 13,
-    # "pneumothorax": 14,
+    "pneumothorax": 14,
     "pleural_effusion": 15,
     # "pleural_other": 16,
     # "fracture": 17,
     # "support_devices": 18,
-    # "ap/pa map": 22,
+    # "ap/pa map": 21,
 }
 elif model_type == "two_stage_first":
     targets = {
@@ -165,7 +172,7 @@ elif model_type == "two_stage_first":
     # "pleural_other": 16,
     # "fracture": 17,
     # "support_devices": 18,
-    "ap/pa map": 22,
+    "ap/pa map": 21,
     }
 elif model_type == "two_stage_second_ap":
     targets = {
@@ -187,7 +194,7 @@ elif model_type == "two_stage_second_ap":
     # "pleural_other": 16,
     # "fracture": 17,
     # "support_devices": 18,
-    # "ap/pa map": 22,
+    # "ap/pa map": 21,
 } 
 elif model_type == "two_stage_second_pa":
     targets = {
@@ -209,7 +216,7 @@ elif model_type == "two_stage_second_pa":
     # "pleural_other": 16,
     # "fracture": 17,
     # "support_devices": 18,
-    # "ap/pa map": 22,
+    # "ap/pa map": 21,
 }
 else:
     raise ValueError("Invalid model type specified.")
@@ -252,38 +259,48 @@ assert len(train_dataset.labels) == len(
     train_dataset
 ), "Mismatch between targets and dataset size!"
 
+# Set default weights path based on model type
+if args.weights_path is None:
+    if model_type == "one_stage_baseline":
+        default_weights = "IMAGENET1K_V2"  # For ResNet50 used in one_stage_baseline
+    else:
+        default_weights = "IMAGENET1K_V1"  # For other models like two_stage_first, second_ap, second_pa
+else:
+    default_weights = args.weights_path  # Use custom weights if provided
+
 with wandb.init(project=model_type, config=params, dir='./logs/wandb'):
-    # 3: CHANGE HERE FOR DIFFERENT MODEL
+    # 3: CREATE MODEL BASED ON MODEL TYPE AND PASS DEFAULT OR CUSTOM WEIGHTS
     if model_type == "one_stage_baseline":
         model = ResNet50OneStage(
             params=params,
-            targets = targets,
-            # num_labels=params["num_labels"],
+            targets=targets,
             input_channels=params["input_channels"],
+            weights=default_weights  # Pass the default or custom weights
         )
     elif model_type == "two_stage_first":
         model = ResNet18OneStage(
             params=params,
-            targets = targets,
-            # num_labels=params["num_labels"],
+            targets=targets,
             input_channels=params["input_channels"],
+            weights=default_weights  # Pass the default or custom weights
         )
     elif model_type == "two_stage_second_ap":
         model = ResNet18OneStage(
             params=params,
-            targets = targets,
-            # num_labels=params["num_labels"],
+            targets=targets,
             input_channels=params["input_channels"],
+            weights=default_weights  # Pass the default or custom weights
         )
     elif model_type == "two_stage_second_pa":
         model = ResNet18OneStage(
             params=params,
-            targets = targets,
-            # num_labels=params["num_labels"],
+            targets=targets,
             input_channels=params["input_channels"],
+            weights=default_weights  # Pass the default or custom weights
         )
     else:
         raise ValueError("Invalid model type specified.")
+    
     
     # wandb.watch(model, log="all")
 
