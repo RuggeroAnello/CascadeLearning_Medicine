@@ -1,0 +1,81 @@
+{
+    "model_type": "one_stage_baseline",
+    "training_name": "ResNet18 PreTraining 5Lab",
+    "task": "one_stage_multi_wrs_ls",
+    "paths": {
+        "data_root_dir": "../image_data/",
+        "train_csv_file_path": "./data/splitted/train.csv",
+        "val_csv_file_path": "./data/splitted/valid.csv"
+    },
+    "targets": {
+        "cardiomegaly": 7,
+        "edema": 10,
+        "consolidation": 11,
+        "atelectasis": 13,
+        "pleural_effusion": 15
+    },
+    "weights": "IMAGENET1K_V2",
+    "//": "As per weights, use pretraining.pth, IMAGENET1K_V2 if ResNet50, IMAGENET1K_V1 if ResNet18",
+    "params": {
+        "params_transform": {
+            "resize": [
+                256,
+                256
+            ],
+            "degree_range": [
+                -15,
+                15
+            ],
+            "translate": [
+                0.1,
+                0.2
+            ],
+            "scale": [
+                0.2,
+                1.0
+            ],
+            "ratio": [
+                0.75,
+                1.3333333333333333
+            ],
+            "gaussian_blur_kernel": 3,
+            "contrast": [
+                0.75,
+                1.25
+            ],
+            "saturation": [
+                0.75,
+                1.25
+            ],
+            "brightness": [
+                0.75,
+                1.25
+            ]
+        },
+        "lr": 0.0001,
+        "lr_decay_gamma": 0.9,
+        "lr_decay_period": 2,
+        "save_epoch": 5,
+        "batch_size": 1024,
+        "num_epochs": 50,
+        "use_weighted_sampler": true,
+        "label_smoothing": 0.2,
+        "input_channels": 1,
+        "optimizer": "adam",
+        "num_workers": 22,
+        "loss_fn": "weighted_bce_loss",
+        "metrics": [
+            "accuracy",
+            "f1_score",
+            "precision",
+            "recall",
+            "confusion_matrix",
+            "auc",
+            "auroc",
+            "multilabel_accuracy",
+            "multilabel_auprc",
+            "multilabel_precision_recall_curve"
+        ],
+        "confidence_threshold": 0.5
+    }
+}

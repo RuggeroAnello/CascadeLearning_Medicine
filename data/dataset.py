@@ -1,7 +1,7 @@
 import os
 import pandas as pd
-import numpy as np 
-import torch 
+import numpy as np
+import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
 from PIL import Image
@@ -22,7 +22,7 @@ class CheXpertDataset(Dataset):
         root_dir: str,
         targets: dict,
         transform: transforms.Compose = None,
-        uncertainty_mapping: bool = True
+        uncertainty_mapping: bool = True,
     ):
         """
         Initializes the CheXpert Dataset.
@@ -45,18 +45,21 @@ class CheXpertDataset(Dataset):
         target_columns = [list(self.data.columns)[idx] for idx in self.targets.values()]
 
         # Only apply uncertainty mapping if uncertainty_mapping is True
-        if uncertainty_mapping:
+        if self.uncertainty_mapping:
             for column in target_columns:
-                if column.lower() in ['edema', 'atelectasis', 'pleural_effusion']:
+                if column.lower() in ["edema", "atelectasis", "pleural_effusion"]:
                     self.data[column] = self.data[column].replace([-1, -1.0], 1)
                 else:
                     self.data[column] = self.data[column].replace([-1, -1.0], 0)
-                
+
         # Extract labels
         self.labels = self.data[target_columns].values
 
         # Find unique labels
         self.unique_labels = np.unique(self.labels)
+
+        # Compute positive weight matrix
+        self.compute_pos_weight_matrix()
 
     def __len__(self):
         return len(self.data)
@@ -76,3 +79,27 @@ class CheXpertDataset(Dataset):
 
         # Ensure the labels are a 1D array
         return img, samples
+
+    def compute_pos_weight_matrix(self):
+        """
+        Computes the positive weight matrix for weighted loss functions.
+        For each label, pos_weight = (# negatives) / (# positives)
+        """
+        # Assume self.labels has shape [num_samples, num_labels] for multilabel classification
+        num_labels = self.labels.shape[1] if self.labels.ndim > 1 else 1
+        pos_weights = []
+        for i in range(num_labels):
+            # Get column i if multilabel otherwise use self.labels
+            col = self.labels[:, i] if num_labels > 1 else self.labels
+            num_pos = np.sum(col == 1)
+            num_neg = np.sum(col == 0)
+            # Avoid division by zero - if there are no positives, use 1
+            pos_weight = num_neg / (num_pos if num_pos > 0 else 1)
+            pos_weights.append(pos_weight)
+
+        # Create a tensor of shape [C]. If your target is 2D (or 3D with spatial dims) and you want the weight applied uniformly,
+        # you can reshape it to [C, 1, 1] as described in the BCEWithLogitsLoss docs.
+        pos_weights = torch.tensor(pos_weights, dtype=torch.float32)
+        # Uncomment the following line if your target has shape [C, H, W] and you want to broadcast on the H and W dimensions:
+        # pos_weights = pos_weights.unsqueeze(1).unsqueeze(2)
+        self.pos_weights = pos_weights

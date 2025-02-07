@@ -5,7 +5,6 @@ import torchvision
 import os
 import wandb
 import numpy as np
-import torch.nn.functional as F
 from torch.utils.data import DataLoader, WeightedRandomSampler
 from torcheval.metrics import (
     BinaryRecall,
@@ -75,9 +74,20 @@ class AbstractOneStageModel(torch.nn.Module):
             "cross_entropy": torch.nn.CrossEntropyLoss(),
             "mse_loss": torch.nn.MSELoss(),
             "BCEWithLogitsLoss": torch.nn.BCEWithLogitsLoss(),
-            # Add other loss functions here if needed
         }  # Set the loss function, defaulting to BCEWithLogitsLoss if not specified
-        self.loss_fn = loss_fn_mapping.get(loss_fn_str, torch.nn.BCEWithLogitsLoss())
+        if loss_fn_str == "weighted_bce_loss":
+            self.use_loss_fn_val = True
+            pos_weights_train = torch.tensor(params.get("pos_weights_train"))
+            pos_weights_val = torch.tensor(params.get("pos_weights_val"))
+            pos_weights_train = pos_weights_train.to(self.device)
+            pos_weights_val = pos_weights_val.to(self.device)
+            self.loss_fn = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weights_train)
+            self.loss_fn_val = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weights_val)
+        else:
+            self.use_loss_fn_val = False
+            self.loss_fn = loss_fn_mapping.get(
+                loss_fn_str, torch.nn.BCEWithLogitsLoss()
+            )
         self.use_weighted_sampler = params.get("use_weighted_sampler", False)
         self.save_epoch = params.get("save_epoch", 1)
         self.confidence_threshold = params.get("confidence_threshold", 0.5)
@@ -344,7 +354,7 @@ class AbstractOneStageModel(torch.nn.Module):
             return torch.optim.SGD(self.model.parameters(), lr=self.lr)
         return torch.optim.Adam(self.model.parameters(), lr=self.lr)
 
-    def train(self, train_dataset, val_dataset, tb_logger, path, log_wandb=True):
+    def train(self, train_dataset, val_dataset, path, tb_logger=None, log_wandb=True):
         # Prepare data loaders
         train_loader, val_loader = self._prepare_dataloaders(train_dataset, val_dataset)
 
@@ -355,6 +365,7 @@ class AbstractOneStageModel(torch.nn.Module):
             gamma=self.lr_decay_gamma,
         )
         loss_fn = self.loss_fn  # Use the loss function configured in the model
+        loss_fn_val = self.loss_fn_val if self.use_loss_fn_val else loss_fn
 
         self.model = self.model.to(self.device)
         print(f"Device used {self.device}")
@@ -414,7 +425,10 @@ class AbstractOneStageModel(torch.nn.Module):
                     metric.reset()
                 for val_iteration, batch in enumerate(val_loop):
                     loss = self._validation_step(
-                        batch, self.val_metrics, self.val_metrics_multilabel, loss_fn
+                        batch,
+                        self.val_metrics,
+                        self.val_metrics_multilabel,
+                        loss_fn_val,
                     )
                     validation_loss += loss.item()
 
@@ -430,7 +444,8 @@ class AbstractOneStageModel(torch.nn.Module):
                 tb_logger.add_scalar("Val/loss", validation_loss, epoch)
 
             # Log validation loss with wandb
-            # wandb.log({"validation_loss": validation_loss})
+            if log_wandb:
+                wandb.log({"validation_loss": validation_loss})
 
             for label in self.val_metrics.keys():
                 for metric_name, metric in self.val_metrics[label].items():
@@ -439,19 +454,23 @@ class AbstractOneStageModel(torch.nn.Module):
                     except ZeroDivisionError:
                         metric_value = 0.0  # Handle edge case
                     # Log validation metrics with tensorboard
-                    # tb_logger.add_scalar(
-                    #    f"Val/{label}_{metric_name}", metric_value, epoch
-                    # )
+                    if tb_logger:
+                        tb_logger.add_scalar(
+                            f"Val/{label}_{metric_name}", metric_value, epoch
+                        )
                     # Log validation metrics with wandb
-                    # wandb.log({f"Val/{metric_name}": metric_value})
+                    if log_wandb:
+                        wandb.log({f"Val/{metric_name}": metric_value})
 
             for metric_name, metric in self.val_metrics_multilabel.items():
                 try:
                     metric_value = metric.compute()
                 except ZeroDivisionError:
                     metric_value = 0.0
-                # tb_logger.add_scalar(f"Val/{metric_name}", metric_value, epoch)
-                # wandb.log({f"Val/{metric_name}": metric_value})
+                if tb_logger:
+                    tb_logger.add_scalar(f"Val/{metric_name}", metric_value, epoch)
+                if log_wandb:
+                    wandb.log({f"Val/{metric_name}": metric_value})
 
             # Save model at specified intervals
             if self.save_epoch and (epoch + 1) % self.save_epoch == 0:
@@ -472,6 +491,8 @@ class AbstractOneStageModel(torch.nn.Module):
             shuffle=False,
             num_workers=self.num_workers,
         )
+
+        loss_fn = self.loss_fn_val if self.use_loss_fn_val else self.loss_fn
 
         self.model.eval()
         test_loop = tqdm(
@@ -495,7 +516,7 @@ class AbstractOneStageModel(torch.nn.Module):
                     batch,
                     self.test_metrics,
                     self.test_metrics_multilabel,
-                    self.loss_fn,
+                    loss_fn,
                 )
                 test_loss += loss.item()
 
@@ -546,7 +567,6 @@ class AbstractOneStageModel(torch.nn.Module):
             if log_wandb:
                 wandb.log({f"Test/{metric_name}": metric_value})
 
-            # TODO Test metrics computation and logging: Done
             # Analogous to validation metrics just use self.test_metrics: Done
             print(f"Test {metric_name}: {metric_value}")
             res[metric_name] = [f"{metric_value}"]
@@ -578,9 +598,7 @@ class ResNet50OneStage(AbstractOneStageModel):
 
         # Load pretrained model
         # Best available weights (currently alias for IMAGENET1K_V2)
-        self.model = torchvision.models.resnet50().to(
-            self.device
-        )
+        self.model = torchvision.models.resnet50().to(self.device)
 
         # Adapt input size of model to the image channels
         if input_channels != 3:
@@ -692,9 +710,7 @@ class ResNet34OneStage(AbstractOneStageModel):
         )
 
         # Load pretrained model
-        self.model = torchvision.models.resnet34().to(
-            self.device
-        )
+        self.model = torchvision.models.resnet34().to(self.device)
 
         # Adapt input size of model to the image channels
         if input_channels != 3:
