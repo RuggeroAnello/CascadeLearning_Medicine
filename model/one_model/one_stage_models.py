@@ -200,7 +200,7 @@ class AbstractOneStageModel(torch.nn.Module):
                 self.val_metrics_multilabel["mcc"].to(self.device)
                 self.test_metrics_multilabel["mcc"].to(self.device)
 
-    def save_model(self, path: str, epoch: int = None, best: bool = False):
+    def save_model(self, path: str, epoch: int = None, best: bool = False, substring = ""):
         """
         Save the model and its weights to the given path.
 
@@ -214,7 +214,7 @@ class AbstractOneStageModel(torch.nn.Module):
         if epoch is not None:
             path = os.path.join(path, f"model_epoch_{epoch}.pth")
         elif best:
-            path = os.path.join(path, "best_model.pth")
+            path = os.path.join(path, f"best_model_{substring}.pth")
         else:
             path = os.path.join(path, "model.pth")
         # self.model.to("cpu") if required move the model to self.device again after saving!
@@ -531,6 +531,7 @@ class AbstractOneStageModel(torch.nn.Module):
                 self.best_val_loss = validation_loss
                 self.save_model(path, best=True)
                 self.best_epoch = epoch
+                self.save_model(path, best=True, substring=f"{epoch + 1}")
 
         print(f"Best validation loss: {self.best_val_loss} at epoch {self.best_epoch}")
 
