@@ -164,6 +164,8 @@ def main():
             or model_type == "two_stage_second_ap"
             or model_type == "two_stage_second_pa"
             or model_type == "two_stage_pretraining"
+            or model_type == "two_stage_second_lat"
+            or model_type == "two_stage_second_fr"
         ):
             model = ResNet18OneStage(
                 params=params,
@@ -198,11 +200,10 @@ def main():
 
         # Train the model
         model.train(
-            train_dataset = train_dataset,
-            val_dataset = val_dataset,
-            path = path,
+            train_dataset=train_dataset,
+            val_dataset=val_dataset,
+            path=path,
         )
-
 
     print("Finished training script.")
 
