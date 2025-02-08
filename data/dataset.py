@@ -101,5 +101,5 @@ class CheXpertDataset(Dataset):
         # you can reshape it to [C, 1, 1] as described in the BCEWithLogitsLoss docs.
         pos_weights = torch.tensor(pos_weights, dtype=torch.float32)
         # Uncomment the following line if your target has shape [C, H, W] and you want to broadcast on the H and W dimensions:
-        # pos_weights = pos_weights.unsqueeze(1).unsqueeze(2)
+        pos_weights = pos_weights.unsqueeze(1).unsqueeze(2)
         self.pos_weights = pos_weights

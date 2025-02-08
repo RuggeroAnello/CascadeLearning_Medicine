@@ -333,7 +333,7 @@ class AbstractOneStageModel(torch.nn.Module):
         loss = loss_fn(outputs, labels)
 
         # Activate the outputs to get the predictions
-        outputs = torch.sigmoid(outputs).squeeze()
+        outputs = torch.sigmoid(outputs)
 
         # Update metrics
         for i, label in enumerate(self.labels):
@@ -431,10 +431,10 @@ class AbstractOneStageModel(torch.nn.Module):
                     metric.reset()
                 for val_iteration, batch in enumerate(val_loop):
                     loss = self._validation_step(
-                        batch,
-                        self.val_metrics,
-                        self.val_metrics_multilabel,
-                        loss_fn_val,
+                        batch=batch,
+                        metrics=self.val_metrics,
+                        multilabel_metrics=self.val_metrics_multilabel,
+                        loss_fn=loss_fn_val,
                     )
                     validation_loss += loss.item()
 
@@ -470,23 +470,29 @@ class AbstractOneStageModel(torch.nn.Module):
 
             for metric_name, metric in self.val_metrics_multilabel.items():
                 try:
-                    if metric == "auc":
+                    if metric_name == "auc":
                         # compute precision recall curve
-                        precision_recall_curve = metric.compute()
+                        metric_value = metric.compute()
                         m = AUC()
-                        m.update(precision_recall_curve[0], precision_recall_curve[1])
+                        m.update(metric_value[0], metric_value[1])
+                        auc = m.compute()
+                        if log_wandb:
+                            wandb.log({f"Test/{metric_name}": auc})
+                            wandb.log({"Test/PrecisionRecallCurve": metric_value})
+                        metric_name = "PrecisionRecallCurve"
                     else:
                         metric_value = metric.compute()
                 except ZeroDivisionError:
+                    print("ZeroDivisionError")
                     metric_value = 0.0
                 if tb_logger:
                     tb_logger.add_scalar(
                         f"Val/multilabel_{metric_name}", metric_value, epoch
                     )
                 if log_wandb:
-                    if metric == "auc":
-                        wandb.log({f"Val/multilabel_{metric_name}": m.compute()})
                     wandb.log({f"Val/multilabel_{metric_name}": metric_value})
+                if metric_name == "mcc" or metric_name == "multilabel_accuracy":
+                    print(f"Val {label} {metric_name}: {metric_value}")
 
             # Save model at specified intervals
             if self.save_epoch and (epoch + 1) % self.save_epoch == 0:
@@ -529,10 +535,10 @@ class AbstractOneStageModel(torch.nn.Module):
             for test_iteration, batch in enumerate(test_loop):
                 # Perform the test step and accumulate the loss
                 loss = self._validation_step(
-                    batch,
-                    self.test_metrics,
-                    self.test_metrics_multilabel,
-                    loss_fn,
+                    batch=batch,
+                    metrics=self.test_metrics,
+                    multilabel_metrics=self.test_metrics_multilabel,
+                    loss_fn=loss_fn,
                 )
                 test_loss += loss.item()
 
