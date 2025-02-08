@@ -61,7 +61,10 @@
         "input_channels": 1,
         "optimizer": "adam",
         "num_workers": 22,
-        "loss_fn": "weighted_bce_loss",
+        "loss_fn": "multilabel_focal_loss",
+        "gamma": 2,
+        "alpha": 0.25,
+        "reduction": "mean",
         "metrics": [
             "accuracy",
             "f1_score",

@@ -144,7 +144,7 @@ def main():
         "Mismatch between targets and dataset size!"
     )
 
-    if params["loss_fn"] == "weighted_bce_loss":
+    if params["loss_fn"] == "weighted_bce_loss" or params["loss_fn"] == "multilabel_focal_loss":
         params["pos_weights_train"] = train_dataset.pos_weights
         params["pos_weights_val"] = val_dataset.pos_weights
 
