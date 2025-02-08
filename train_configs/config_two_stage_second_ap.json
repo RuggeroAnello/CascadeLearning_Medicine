@@ -1,11 +1,11 @@
 {
-    "model_type": "two_stage_pretraining",
-    "training_name": "ResNet18 PreTraining 5Lab",
-    "task": "one_stage_multi_wrs_ls",
+    "model_type": "two_stage_second_ap",
+    "training_name": "5LabAP_w/Pretraining",
+    "task": "second_stage_ap_multi_wrs_ls",
     "paths": {
         "data_root_dir": "../image_data/",
-        "train_csv_file_path": "./data/splitted/train.csv",
-        "val_csv_file_path": "./data/splitted/valid.csv"
+        "train_csv_file_path": "./data/splitted/ap_train.csv",
+        "val_csv_file_path": "./data/splitted/ap_valid.csv"
     },
     "targets": {
         "cardiomegaly": 7,
@@ -14,7 +14,7 @@
         "atelectasis": 13,
         "pleural_effusion": 15
     },
-    "weights": "IMAGENET1K_V1",
+    "weights": "pretraining.pth",
     "//": "As per weights, use pretraining.pth, IMAGENET1K_V2 if ResNet50, IMAGENET1K_V1 if ResNet18",
     "params": {
         "params_transform": {
@@ -52,7 +52,7 @@
                 1.25
             ]
         },
-        "lr": 0.0001,
+        "lr": 0.00001,
         "lr_decay_gamma": 0.9,
         "lr_decay_period": 2,
         "save_epoch": 5,

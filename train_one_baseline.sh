@@ -22,9 +22,5 @@ echo "Running experiment: config_one_stage_baseline"
 
 export PYTHONUNBUFFERED=true
 
-conda deactivate
-
-source activate personalized_ml
-
 # Run the training script
 python train.py --config_path train_configs/config_one_stage_baseline.json

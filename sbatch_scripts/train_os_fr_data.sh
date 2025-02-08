@@ -21,5 +21,5 @@
 export PYTHONUNBUFFERED=true
 
 # Run the training script
-python train_new.py --config_path train_configs/config_os_fr-data.json
+python train.py --config_path train_configs/config_os_fr-data.json
                                            

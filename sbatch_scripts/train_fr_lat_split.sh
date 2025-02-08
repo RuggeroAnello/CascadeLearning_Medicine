@@ -21,5 +21,5 @@
 export PYTHONUNBUFFERED=true
 
 # Run the training script
-python train_new.py --config_path train_configs/config_fr-lat_split.json
+python train.py --config_path train_configs/config_fr-lat_split.json
                                            
