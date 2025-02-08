@@ -17,6 +17,9 @@ class MultilabelFocalLoss(nn.Module):
             num_classes (int): Number of classes (default: 5).
             pos_weight (torch.Tensor): Positive weight for each class (default: None).
         """
+        if reduction not in ["mean", "sum"]:
+            print("Invalid reduction method specified. Defaulting to 'mean'.")
+            reduction = "mean"
         super(MultilabelFocalLoss, self).__init__()
         self.gamma = gamma
         self.alpha = alpha
