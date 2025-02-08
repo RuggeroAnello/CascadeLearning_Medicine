@@ -465,7 +465,7 @@ class AbstractOneStageModel(torch.nn.Module):
                         )
                     # Log validation metrics with wandb
                     if log_wandb:
-                        wandb.log({f"Val/{metric_name}": metric_value})
+                        wandb.log({f"Val/{label}_{metric_name}": metric_value})
 
             for metric_name, metric in self.val_metrics_multilabel.items():
                 try:
@@ -473,9 +473,9 @@ class AbstractOneStageModel(torch.nn.Module):
                 except ZeroDivisionError:
                     metric_value = 0.0
                 if tb_logger:
-                    tb_logger.add_scalar(f"Val/{metric_name}", metric_value, epoch)
+                    tb_logger.add_scalar(f"Val/multilabel_{metric_name}", metric_value, epoch)
                 if log_wandb:
-                    wandb.log({f"Val/{metric_name}": metric_value})
+                    wandb.log({f"Val/multilabel_{metric_name}": metric_value})
 
             # Save model at specified intervals
             if self.save_epoch and (epoch + 1) % self.save_epoch == 0:

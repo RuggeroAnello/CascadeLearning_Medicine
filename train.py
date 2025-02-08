@@ -197,7 +197,12 @@ def main():
         model.save_hparams(path)
 
         # Train the model
-        model.train(train_dataset, val_dataset, tb_logger, path, log_wandb=True)
+        model.train(
+            train_dataset = train_dataset,
+            val_dataset = val_dataset,
+            path = path,
+        )
+
 
     print("Finished training script.")
 
