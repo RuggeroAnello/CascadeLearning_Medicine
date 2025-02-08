@@ -202,8 +202,13 @@ class AbstractOneStageModel(torch.nn.Module):
         if not os.path.exists(os.path.dirname(path)):
             os.makedirs(os.path.dirname(path))
         path = os.path.join(path, "hparams.json")
+        params = self.params.copy()
+        if "pos_weights_train" in self.params:
+            del params["pos_weights_train"]
+        if "pos_weights_val" in self.params:
+            del params["pos_weights_val"]
         with open(path, "w") as f:
-            json.dump(self.params, f)
+            json.dump(params, f)
 
     def load_hparams(self, path: str):
         self.params = json.load(open(path, "r"))

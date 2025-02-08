@@ -163,6 +163,7 @@ def main():
             model_type == "two_stage_first"
             or model_type == "two_stage_second_ap"
             or model_type == "two_stage_second_pa"
+            or model_type == "two_stage_pretraining"
         ):
             model = ResNet18OneStage(
                 params=params,
