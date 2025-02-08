@@ -1,6 +1,6 @@
 {
     "model_type": "one_stage_baseline",
-    "training_name": "ResNet50 Baseline - Weighted Loss",
+    "training_name": "ResNet50 Baseline - Focal Loss",
     "task": "one_stage_multi_wrs_ls",
     "paths": {
         "data_root_dir": "../image_data/",
@@ -52,7 +52,7 @@
                 1.25
             ]
         },
-        "lr": 0.0001,
+        "lr": 0.00005,
         "lr_decay_gamma": 0.9,
         "lr_decay_period": 2,
         "save_epoch": 5,
