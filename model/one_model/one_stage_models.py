@@ -21,6 +21,8 @@ from torcheval.metrics import (
 )
 from torchmetrics.classification import MultilabelMatthewsCorrCoef
 
+from model.loss import MultilabelFocalLoss
+
 from tqdm import tqdm
 
 
@@ -70,7 +72,9 @@ class AbstractOneStageModel(torch.nn.Module):
         self.optimizer_name = params.get("optimizer", "adam")
         self.label_smoothing = params.get("label_smoothing", 0.2)
         # Map string loss function names to actual loss function classes
-        loss_fn_str = params.get("loss_fn", "BCEWithLogitsLoss")
+        loss_fn_str = params.get("loss_fn")
+        if loss_fn_str is None:
+            raise ValueError("Loss function not specified or invalid loss function!")
         loss_fn_mapping = {
             "cross_entropy": torch.nn.CrossEntropyLoss(),
             "mse_loss": torch.nn.MSELoss(),
@@ -84,6 +88,32 @@ class AbstractOneStageModel(torch.nn.Module):
             pos_weights_val = pos_weights_val.to(self.device)
             self.loss_fn = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weights_train)
             self.loss_fn_val = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weights_val)
+        elif loss_fn_str == "multilabel_focal_loss":
+            self.use_loss_fn_val = True
+            if "pos_weights_train" in params:
+                pos_weights_train = torch.tensor(params.get("pos_weights_train"))
+                pos_weights_train = pos_weights_train.to(self.device)
+            else:
+                pos_weights_train = None
+            if "pos_weights_val" in params:
+                pos_weights_val = torch.tensor(params.get("pos_weights_val"))
+                pos_weights_val = pos_weights_val.to(self.device)
+            else:
+                pos_weights_val = None
+            self.loss_fn = MultilabelFocalLoss(
+                gamma=params.get("gamma", 2),
+                alpha=params.get("alpha", None),
+                reduction=params.get("reduction", "mean"),
+                num_classes=len(self.labels),
+                pos_weight=pos_weights_train,
+            )
+            self.loss_fn_val = MultilabelFocalLoss(
+                gamma=params.get("gamma", 2),
+                alpha=params.get("alpha", None),
+                reduction=params.get("reduction", "mean"),
+                num_classes=len(self.labels),
+                pos_weight=pos_weights_val,
+            )
         else:
             self.use_loss_fn_val = False
             self.loss_fn = loss_fn_mapping.get(
@@ -491,8 +521,6 @@ class AbstractOneStageModel(torch.nn.Module):
                     )
                 if log_wandb:
                     wandb.log({f"Val/multilabel_{metric_name}": metric_value})
-                if metric_name == "mcc" or metric_name == "multilabel_accuracy":
-                    print(f"Val {label} {metric_name}: {metric_value}")
 
             # Save model at specified intervals
             if self.save_epoch and (epoch + 1) % self.save_epoch == 0:
@@ -588,7 +616,9 @@ class AbstractOneStageModel(torch.nn.Module):
                 # Log test metrics with wandb
                 if log_wandb:
                     wandb.log({f"Test/{metric_name}": metric_value})
-                print(f"Test {label} {metric_name}: {metric_value}")
+                print(
+                    f"Test {label} {metric_name}: {metric_value}"
+                ) if metric_name != "PrecisionRecallCurve" else None
                 res[f"{label}_{metric_name}"] = [f"{metric_value}"]
 
         for metric_name, metric in self.test_metrics_multilabel.items():
@@ -603,7 +633,9 @@ class AbstractOneStageModel(torch.nn.Module):
                 wandb.log({f"Test/{metric_name}": metric_value})
 
             # Analogous to validation metrics just use self.test_metrics: Done
-            print(f"Test {metric_name}: {metric_value}")
+            print(
+                f"Test {metric_name}: {metric_value}"
+            ) if metric_name != "multilabel_precision_recall_curve" else None
             res[metric_name] = [f"{metric_value}"]
 
         # Append res to result
