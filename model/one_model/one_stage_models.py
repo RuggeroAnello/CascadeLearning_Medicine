@@ -12,6 +12,7 @@ from torcheval.metrics import (
     BinaryF1Score,
     BinaryAccuracy,
     BinaryAUROC,
+    BinaryPrecisionRecallCurve,
     AUC,
     MultilabelAccuracy,
     MultilabelAUPRC,
@@ -132,8 +133,8 @@ class AbstractOneStageModel(torch.nn.Module):
                 self.val_metrics[label]["auroc"] = BinaryAUROC()
                 self.test_metrics[label]["auroc"] = BinaryAUROC()
             if "auc" in metrics:
-                self.val_metrics[label]["auc"] = AUC()
-                self.test_metrics[label]["auc"] = AUC()
+                self.val_metrics[label]["auc"] = BinaryPrecisionRecallCurve()
+                self.test_metrics[label]["auc"] = BinaryPrecisionRecallCurve()
             if "confusion_matrix" in metrics:
                 self.val_metrics[label]["confusion_matrix"] = BinaryConfusionMatrix()
                 self.test_metrics[label]["confusion_matrix"] = BinaryConfusionMatrix()
@@ -469,12 +470,22 @@ class AbstractOneStageModel(torch.nn.Module):
 
             for metric_name, metric in self.val_metrics_multilabel.items():
                 try:
-                    metric_value = metric.compute()
+                    if metric == "auc":
+                        # compute precision recall curve
+                        precision_recall_curve = metric.compute()
+                        m = AUC()
+                        m.update(precision_recall_curve[0], precision_recall_curve[1])
+                    else:
+                        metric_value = metric.compute()
                 except ZeroDivisionError:
                     metric_value = 0.0
                 if tb_logger:
-                    tb_logger.add_scalar(f"Val/multilabel_{metric_name}", metric_value, epoch)
+                    tb_logger.add_scalar(
+                        f"Val/multilabel_{metric_name}", metric_value, epoch
+                    )
                 if log_wandb:
+                    if metric == "auc":
+                        wandb.log({f"Val/multilabel_{metric_name}": m.compute()})
                     wandb.log({f"Val/multilabel_{metric_name}": metric_value})
 
             # Save model at specified intervals
@@ -549,7 +560,20 @@ class AbstractOneStageModel(torch.nn.Module):
         for label in self.test_metrics.keys():
             for metric_name, metric in self.test_metrics[label].items():
                 try:
-                    metric_value = metric.compute()
+                    if metric_name == "auc":
+                        # compute precision recall curve
+                        metric_value = metric.compute()
+                        m = AUC()
+                        m.update(metric_value[0], metric_value[1])
+                        auc = m.compute()
+                        if log_wandb:
+                            wandb.log({f"Test/{metric_name}": auc})
+                            wandb.log({"Test/PrecisionRecallCurve": metric_value})
+                        print(f"Test {label} {metric_name}: {auc}")
+                        res[f"{label}_{metric_name}"] = [f"{auc}"]
+                        metric_name = "PrecisionRecallCurve"
+                    else:
+                        metric_value = metric.compute()
                 except ZeroDivisionError:
                     metric_value = 0.0  # Handle edge case
                 # Log test metrics with tensorboard
@@ -557,7 +581,7 @@ class AbstractOneStageModel(torch.nn.Module):
                     tb_logger.add_scalar(f"Test/{label}_{metric_name}", metric_value)
                 # Log test metrics with wandb
                 if log_wandb:
-                    wandb.log({f"Test/{label}_{metric_name}": metric_value})
+                    wandb.log({f"Test/{metric_name}": metric_value})
                 print(f"Test {label} {metric_name}: {metric_value}")
                 res[f"{label}_{metric_name}"] = [f"{metric_value}"]
 
