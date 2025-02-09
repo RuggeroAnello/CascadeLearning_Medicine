@@ -56,6 +56,7 @@ class AbstractOneStageModel(torch.nn.Module):
 
         # Best model results
         self.best_val_loss = np.inf
+        self.best_mcc = -1 if "mcc" in self.params.get("metrics", []) else 0
         self.best_epoch = -1
 
     def forward(self, x):
@@ -541,6 +542,8 @@ class AbstractOneStageModel(torch.nn.Module):
                         metric_name = "PrecisionRecallCurve"
                     else:
                         metric_value = metric.compute()
+                        if metric_name == "mcc":
+                            mcc = metric_value
                 except ZeroDivisionError:
                     print("ZeroDivisionError")
                     metric_value = 0.0
@@ -561,6 +564,10 @@ class AbstractOneStageModel(torch.nn.Module):
                 self.save_model(path, best=True)
                 self.best_epoch = epoch
                 self.save_model(path, best=True, substring=f"{epoch + 1}")
+
+            if mcc > self.best_mcc:
+                self.best_mcc = mcc
+                self.save_model(path, best=True, substring=f"mcc_{epoch + 1}")
 
         print(f"Best validation loss: {self.best_val_loss} at epoch {self.best_epoch}")
 
@@ -630,6 +637,7 @@ class AbstractOneStageModel(torch.nn.Module):
                         m = AUC()
                         m.update(metric_value[0], metric_value[1])
                         auc = m.compute()
+                        auc = float(auc)
                         if log_wandb:
                             wandb.log({f"Test/{metric_name}": auc})
                             wandb.log({"Test/PrecisionRecallCurve": metric_value})

@@ -1,6 +1,6 @@
 {
     "model_type": "two_stage_second_lat",
-    "training_name": "5LabLAT_NoPretraining - gamma 2, alpha 0.25, lr 0.00005, class weights",
+    "training_name": "5LabLAT_NoPretraining 10e-4",
     "task": "second_stage_pa_multi_wrs_ls",
     "paths": {
         "data_root_dir": "../image_data/",
@@ -52,7 +52,7 @@
                 1.25
             ]
         },
-        "lr": 0.00005,
+        "lr": 0.0001,
         "lr_decay_gamma": 0.9,
         "lr_decay_period": 2,
         "save_epoch": 5,
@@ -64,7 +64,7 @@
         "optimizer": "adam",
         "num_workers": 0,
         "loss_fn": "multilabel_focal_loss",
-        "pos_weights": false,
+        "pos_weights": true,
         "class_weights": true,
         "gamma": 2,
         "alpha": 0.25,
