@@ -60,6 +60,7 @@ class CheXpertDataset(Dataset):
 
         # Compute positive weight matrix
         self.compute_pos_weight_matrix()
+        self.compute_class_weights()
 
     def __len__(self):
         return len(self.data)
@@ -103,3 +104,23 @@ class CheXpertDataset(Dataset):
         # Uncomment the following line if your target has shape [C, H, W] and you want to broadcast on the H and W dimensions:
         # pos_weights = pos_weights.unsqueeze(1).unsqueeze(2)
         self.pos_weights = pos_weights
+
+    def compute_class_weights(self):
+        """
+        Computes the class weights for the focal loss. The class weights are the inverse frequency of the classes.
+        """
+        num_labels = self.labels.shape[1] if self.labels.ndim > 1 else 1
+        class_weights = []
+        for i in range(num_labels):
+            col = self.labels[:, i] if num_labels > 1 else self.labels
+            num_pos = np.sum(col == 1)
+            num_neg = np.sum(col == 0)
+            ratio = num_neg / num_pos
+            weight = 1 + np.abs(np.log(ratio))
+
+            # Update class weights
+            class_weights.append(weight)
+
+        self.class_weights = class_weights
+
+        print(f"Class weights: {self.class_weights}")

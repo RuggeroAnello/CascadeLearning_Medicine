@@ -144,9 +144,22 @@ def main():
         "Mismatch between targets and dataset size!"
     )
 
-    if params["loss_fn"] == "weighted_bce_loss" or params["loss_fn"] == "multilabel_focal_loss":
-        params["pos_weights_train"] = train_dataset.pos_weights
-        params["pos_weights_val"] = val_dataset.pos_weights
+    if (
+        params["loss_fn"] == "weighted_bce_loss"
+        or params["loss_fn"] == "multilabel_focal_loss"
+    ):
+        if params["pos_weights"]:
+            params["pos_weights_train"] = train_dataset.pos_weights
+            params["pos_weights_val"] = train_dataset.pos_weights
+        else:
+            params["pos_weights_train"] = None
+            params["pos_weights_val"] = None
+        if params["class_weights"]:
+            params["class_weights_train"] = train_dataset.class_weights
+            params["class_weights_val"] = train_dataset.class_weights
+        else:
+            params["class_weights_train"] = None
+            params["class_weights_val"] = None
 
     with wandb.init(
         name=training_name, project=model_type, config=params, dir="./logs/wandb"

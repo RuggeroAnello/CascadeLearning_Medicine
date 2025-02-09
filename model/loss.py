@@ -1,11 +1,18 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torchvision.ops as ops
 
 
 class MultilabelFocalLoss(nn.Module):
     def __init__(
-        self, gamma=2, alpha=None, reduction="mean", num_classes=5, pos_weight=None
+        self,
+        gamma=2,
+        alpha=None,
+        reduction="mean",
+        num_classes=5,
+        pos_weight=None,
+        class_weights=None,
     ):
         """
         Initializes the Multilabel Focal Loss.
@@ -26,41 +33,41 @@ class MultilabelFocalLoss(nn.Module):
         self.reduction = reduction
         self.num_classes = num_classes
         self.pos_weight = pos_weight
+        self.class_weights = class_weights
 
     def forward(self, inputs, targets):
         """
         Computes the Multilabel Focal Loss.
 
         Args:
-            inputs (torch.Tensor): Model predictions.
+            inputs (torch.Tensor): Raw model predictions (logits).
             targets (torch.Tensor): Ground truth labels.
 
         Returns:
             torch.Tensor: Multilabel Focal Loss.
         """
-        # Compute the logit
-        logit = F.sigmoid(inputs)
+        p = torch.sigmoid(inputs)
 
-        # Compute the log loss
-        log_loss = F.binary_cross_entropy_with_logits(
-            logit, targets, reduction="none", pos_weight=self.pos_weight
-        )
+        ce_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction="none")
+        p_t = p * targets + (1 - p) * (1 - targets)
+        loss = ce_loss * ((1 - p_t) ** self.gamma)
 
-        # Compute the focal weight
-        p_t = logit * targets + (1 - logit) * (1 - targets)
-        focal_weight = torch.pow(1 - p_t, self.gamma)
-
-        # Apply alpha if provided
-        if self.alpha:
+        if self.alpha and self.alpha >= 0:
             alpha_t = self.alpha * targets + (1 - self.alpha) * (1 - targets)
-            log_loss = alpha_t * log_loss
+            loss = alpha_t * loss
 
-        # Apply focal weight
-        loss = focal_weight * log_loss
+        if self.pos_weight is not None:
+            loss = loss * self.class_weights
 
-        if self.reduction == "mean":
-            return loss.mean()
+        # Check reduction option and return loss accordingly
+        if self.reduction == "none":
+            pass
+        elif self.reduction == "mean":
+            loss = loss.mean()
         elif self.reduction == "sum":
-            return loss.sum()
+            loss = loss.sum()
         else:
-            return loss
+            raise ValueError(
+                f"Invalid Value for arg 'reduction': '{self.reduction} \n Supported reduction modes: 'none', 'mean', 'sum'"
+            )
+        return loss

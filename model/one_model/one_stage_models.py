@@ -90,22 +90,48 @@ class AbstractOneStageModel(torch.nn.Module):
             self.loss_fn_val = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weights_val)
         elif loss_fn_str == "multilabel_focal_loss":
             self.use_loss_fn_val = True
-            if "pos_weights_train" in params:
+            # Pos_weights
+            if (
+                "pos_weights_train" in params
+                and params.get("pos_weights_train") is not None
+            ):
                 pos_weights_train = torch.tensor(params.get("pos_weights_train"))
                 pos_weights_train = pos_weights_train.to(self.device)
             else:
                 pos_weights_train = None
-            if "pos_weights_val" in params:
+            if (
+                "pos_weights_val" in params
+                and params.get("pos_weights_val") is not None
+            ):
                 pos_weights_val = torch.tensor(params.get("pos_weights_val"))
                 pos_weights_val = pos_weights_val.to(self.device)
             else:
                 pos_weights_val = None
+            # Class weights
+            if (
+                "class_weights_train" in params
+                and params.get("class_weights_train") is not None
+            ):
+                class_weights_train = torch.tensor(params.get("class_weights_train"))
+                class_weights_train = class_weights_train.to(self.device)
+            else:
+                class_weights_train = None
+            if (
+                "class_weights_val" in params
+                and params.get("class_weights_val") is not None
+            ):
+                class_weights_val = torch.tensor(params.get("class_weights_val"))
+                class_weights_val = class_weights_val.to(self.device)
+            else:
+                class_weights_val = None
+
             self.loss_fn = MultilabelFocalLoss(
                 gamma=params.get("gamma", 2),
                 alpha=params.get("alpha", None),
                 reduction=params.get("reduction", "mean"),
                 num_classes=len(self.labels),
                 pos_weight=pos_weights_train,
+                class_weights=class_weights_train,
             )
             self.loss_fn_val = MultilabelFocalLoss(
                 gamma=params.get("gamma", 2),
@@ -113,6 +139,7 @@ class AbstractOneStageModel(torch.nn.Module):
                 reduction=params.get("reduction", "mean"),
                 num_classes=len(self.labels),
                 pos_weight=pos_weights_val,
+                class_weights=class_weights_val,
             )
         else:
             self.use_loss_fn_val = False
@@ -200,7 +227,9 @@ class AbstractOneStageModel(torch.nn.Module):
                 self.val_metrics_multilabel["mcc"].to(self.device)
                 self.test_metrics_multilabel["mcc"].to(self.device)
 
-    def save_model(self, path: str, epoch: int = None, best: bool = False, substring = ""):
+    def save_model(
+        self, path: str, epoch: int = None, best: bool = False, substring=""
+    ):
         """
         Save the model and its weights to the given path.
 
