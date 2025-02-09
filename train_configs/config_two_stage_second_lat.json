@@ -1,7 +1,7 @@
 {
     "model_type": "two_stage_second_lat",
-    "training_name": "5LabLAT_NoPretraining 10e-4",
-    "task": "second_stage_pa_multi_wrs_ls",
+    "training_name": "5LabLAT_NoPretraining",
+    "task": "second_stage_lat",
     "paths": {
         "data_root_dir": "../image_data/",
         "train_csv_file_path": "./data/splitted/lat_train.csv",
@@ -52,12 +52,12 @@
                 1.25
             ]
         },
-        "lr": 0.0001,
+        "lr": 0.00005,
         "lr_decay_gamma": 0.9,
         "lr_decay_period": 2,
         "save_epoch": 5,
         "batch_size": 128,
-        "num_epochs": 10,
+        "num_epochs": 50,
         "use_weighted_sampler": true,
         "label_smoothing": 0.2,
         "input_channels": 1,
