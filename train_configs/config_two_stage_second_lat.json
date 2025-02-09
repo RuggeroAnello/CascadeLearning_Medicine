@@ -1,6 +1,6 @@
 {
     "model_type": "two_stage_second_lat",
-    "training_name": "5LabLAT_NoPretraining - gamma 2, alpha 0.25, lr 0.00005, class weights, pos weights",
+    "training_name": "5LabLAT_NoPretraining - gamma 2, alpha 0.25, lr 0.00005, class weights",
     "task": "second_stage_pa_multi_wrs_ls",
     "paths": {
         "data_root_dir": "../image_data/",
@@ -64,7 +64,7 @@
         "optimizer": "adam",
         "num_workers": 0,
         "loss_fn": "multilabel_focal_loss",
-        "pos_weights": true,
+        "pos_weights": false,
         "class_weights": true,
         "gamma": 2,
         "alpha": 0.25,

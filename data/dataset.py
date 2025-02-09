@@ -107,7 +107,8 @@ class CheXpertDataset(Dataset):
 
     def compute_class_weights(self):
         """
-        Computes the class weights for the focal loss. The class weights are the inverse frequency of the classes.
+        Computes the class weights for the focal loss. The class weights are computed as:
+        weight = 1 + |log(ratio)|, where ratio = (# negatives) / (# positives)
         """
         num_labels = self.labels.shape[1] if self.labels.ndim > 1 else 1
         class_weights = []
