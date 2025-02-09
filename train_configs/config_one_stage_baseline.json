@@ -1,7 +1,7 @@
 {
     "model_type": "one_stage_baseline",
-    "training_name": "ResNet50 Baseline - Focal Loss",
-    "task": "one_stage_multi_wrs_ls",
+    "training_name": "os_baseline_pos-class-weights",
+    "task": "os_baseline_resnet50",
     "paths": {
         "data_root_dir": "../image_data/",
         "train_csv_file_path": "./data/splitted/train.csv",
@@ -52,7 +52,7 @@
                 1.25
             ]
         },
-        "lr": 0.00005,
+        "lr": 5e-5,
         "lr_decay_gamma": 0.9,
         "lr_decay_period": 2,
         "save_epoch": 5,
@@ -64,6 +64,8 @@
         "optimizer": "adam",
         "num_workers": 22,
         "loss_fn": "multilabel_focal_loss",
+        "pos_weights": true,
+        "class_weights": true,
         "gamma": 2,
         "alpha": 0.25,
         "reduction": "mean",

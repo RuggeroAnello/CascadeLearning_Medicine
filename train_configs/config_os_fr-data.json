@@ -1,11 +1,11 @@
 {
     "model_type": "one_stage_baseline",
-    "training_name": "os_fr-data - Focal Loss",
-    "task": "os_fr-data",
+    "training_name": "os_fr-data_pos-class-weights",
+    "task": "os_baseline_fr_resnet50",
     "paths": {
         "data_root_dir": "../image_data/",
-        "train_csv_file_path": "../rugdev_Personalized_ML/data/splitted/fr_train.csv",
-        "val_csv_file_path": "../rugdev_Personalized_ML/data/splitted/fr_valid.csv"
+        "train_csv_file_path": "./data/splitted/fr_train.csv",
+        "val_csv_file_path": "./data/splitted/fr_valid.csv"
     },
     "targets": {
         "cardiomegaly": 7,
@@ -14,6 +14,8 @@
         "atelectasis": 13,
         "pleural_effusion": 15
     },
+    "weights": "IMAGENET1K_V2",
+    "//": "As per weights, use pretraining.pth, IMAGENET1K_V2 if ResNet50, IMAGENET1K_V1 if ResNet18",
     "params": {
         "params_transform": {
             "resize": [
@@ -50,7 +52,7 @@
                 1.25
             ]
         },
-        "lr": 0.00005,
+        "lr": 5e-5,
         "lr_decay_gamma": 0.9,
         "lr_decay_period": 2,
         "save_epoch": 5,
@@ -62,6 +64,8 @@
         "optimizer": "adam",
         "num_workers": 22,
         "loss_fn": "multilabel_focal_loss",
+        "pos_weights": true,
+        "class_weights": true,
         "gamma": 2,
         "alpha": 0.25,
         "reduction": "mean",
