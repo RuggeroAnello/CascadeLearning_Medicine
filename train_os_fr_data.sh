@@ -16,7 +16,7 @@
 #SBATCH --gres=gpu:1  # Number of GPUs if needed
 #SBATCH --cpus-per-task=24  # Number of CPUs (Don't use more than 24 per GPU)
 #SBATCH --mem=48G  # Memory in GB (Don't use more than 48GB per GPU unless you absolutely need it and know what you are doing)
-#SBATCH --qos=master
+#SBATCH --qos=master-queuesave
 
 export PYTHONUNBUFFERED=true
 
