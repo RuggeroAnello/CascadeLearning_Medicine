@@ -363,22 +363,11 @@ class AbstractOneStageModel(torch.nn.Module):
         images, labels = batch
         images, labels = images.to(self.device), labels.to(self.device)
 
-        # Apply label smoothing only during training
-        if hasattr(self, "label_smoothing") and self.label_smoothing > 0:
-            # Convert labels to float if they aren't already
-            smoothed_labels = labels.float()
-            # Apply label smoothing: move the labels closer to 0.5
-            smoothed_labels = (
-                1 - self.label_smoothing
-            ) * smoothed_labels + self.label_smoothing * 0.5
-        else:
-            smoothed_labels = labels
-
         # Forward pass
         outputs = self.forward(images)
 
         # Compute loss
-        loss = loss_fn(outputs, smoothed_labels)
+        loss = loss_fn(outputs, labels)
 
         return loss
 

@@ -128,6 +128,9 @@ def main():
         targets=targets,
         transform=transform,
         uncertainty_mapping=True,
+        label_smoothing=params["label_smoothing"]
+        if "label_smoothing" in params
+        else None,
     )
     val_dataset = CheXpertDataset(
         csv_file=paths["val_csv_file_path"],

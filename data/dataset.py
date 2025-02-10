@@ -23,6 +23,7 @@ class CheXpertDataset(Dataset):
         targets: dict,
         transform: transforms.Compose = None,
         uncertainty_mapping: bool = True,
+        label_smoothing: float = 0.0,
     ):
         """
         Initializes the CheXpert Dataset.
@@ -40,17 +41,43 @@ class CheXpertDataset(Dataset):
         self.transform = transform
         self.targets = targets
         self.uncertainty_mapping = uncertainty_mapping
+        self.label_smoothing = label_smoothing
 
         # Extract target columns
         target_columns = [list(self.data.columns)[idx] for idx in self.targets.values()]
 
+        self.zero = 0.0
+        self.one = 1.0
+
         # Only apply uncertainty mapping if uncertainty_mapping is True
         if self.uncertainty_mapping:
-            for column in target_columns:
-                if column.lower() in ["edema", "atelectasis", "pleural_effusion"]:
-                    self.data[column] = self.data[column].replace([-1, -1.0], 1)
-                else:
-                    self.data[column] = self.data[column].replace([-1, -1.0], 0)
+            if self.label_smoothing > 0:
+                for column in target_columns:
+                    # Convert labels to float if they aren't already
+                    self.zero = 0.0
+                    self.one = 1.0
+                    # Apply label smoothing: move the labels closer to 0.5
+                    self.zero = (
+                        1 - self.label_smoothing
+                    ) * self.zero + self.label_smoothing * 0.5
+                    self.one = (
+                        1 - self.label_smoothing
+                    ) * self.one + self.label_smoothing * 0.5
+
+                    if column.lower() in ["edema", "atelectasis", "pleural_effusion"]:
+                        self.data[column] = self.data[column].replace(
+                            [-1, -1.0], self.one
+                        )
+                    else:
+                        self.data[column] = self.data[column].replace(
+                            [-1, -1.0], self.zero
+                        )
+            else:
+                for column in target_columns:
+                    if column.lower() in ["edema", "atelectasis", "pleural_effusion"]:
+                        self.data[column] = self.data[column].replace([-1, -1.0], 1)
+                    else:
+                        self.data[column] = self.data[column].replace([-1, -1.0], 0)
 
         # Extract labels
         self.labels = self.data[target_columns].values
@@ -94,6 +121,9 @@ class CheXpertDataset(Dataset):
             col = self.labels[:, i] if num_labels > 1 else self.labels
             num_pos = np.sum(col == 1)
             num_neg = np.sum(col == 0)
+            if self.label_smoothing > 0:
+                num_pos += np.sum(col == self.one)
+                num_neg += np.sum(col == self.zero)
             # Avoid division by zero - if there are no positives, use 1
             pos_weight = num_neg / (num_pos if num_pos > 0 else 1)
             pos_weights.append(pos_weight)
@@ -116,6 +146,10 @@ class CheXpertDataset(Dataset):
             col = self.labels[:, i] if num_labels > 1 else self.labels
             num_pos = np.sum(col == 1)
             num_neg = np.sum(col == 0)
+            if self.label_smoothing > 0:
+                num_pos += np.sum(col == self.one)
+                num_neg += np.sum(col == self.zero)
+
             ratio = num_neg / num_pos
             weight = 1 + np.abs(np.log(ratio))
 
