@@ -18,8 +18,10 @@
 #SBATCH --mem=48G  # Memory in GB (Don't use more than 48GB per GPU unless you absolutely need it and know what you are doing)
 #SBATCH --qos=master-queuesave
 
+echo "Running experiment: config_wo_stage_second_pa_no_pretraining"
+
 export PYTHONUNBUFFERED=true
 
 # Run the training script
-python train.py --config_path train_configs/config_two_stage_second_ap.json
+python train.py --config_path train_configs/config_two_stage_second_pa_no_pretraining.json
                                            
