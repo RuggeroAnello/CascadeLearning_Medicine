@@ -56,6 +56,7 @@ class AbstractOneStageModel(torch.nn.Module):
 
         # Best model results
         self.best_val_loss = np.inf
+        self.best_auprc = -1 if "auprc" in self.params.get("metrics", []) else 0
         self.best_mcc = -1 if "mcc" in self.params.get("metrics", []) else 0
         self.best_epoch = -1
 
@@ -422,6 +423,9 @@ class AbstractOneStageModel(torch.nn.Module):
         loss_fn = self.loss_fn  # Use the loss function configured in the model
         loss_fn_val = self.loss_fn_val if self.use_loss_fn_val else loss_fn
 
+        mcc = -1
+        auprc = -1
+
         self.model = self.model.to(self.device)
         print(f"Device used {self.device}")
 
@@ -533,6 +537,8 @@ class AbstractOneStageModel(torch.nn.Module):
                         metric_value = metric.compute()
                         if metric_name == "mcc":
                             mcc = metric_value
+                        if metric_name == "auprc":
+                            auprc = metric_value
                 except ZeroDivisionError:
                     print("ZeroDivisionError")
                     metric_value = 0.0
@@ -557,6 +563,10 @@ class AbstractOneStageModel(torch.nn.Module):
             if mcc > self.best_mcc:
                 self.best_mcc = mcc
                 self.save_model(path, best=True, substring=f"mcc_{epoch + 1}")
+
+            if auprc > self.best_auprc:
+                self.best_auprc = auprc
+                self.save_model(path, best=True, substring=f"auprc_{epoch + 1}")
 
         print(f"Best validation loss: {self.best_val_loss} at epoch {self.best_epoch}")
 
