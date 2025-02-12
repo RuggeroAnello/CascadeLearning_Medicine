@@ -12,7 +12,7 @@ This repository contains several branches:
 - "development_-name-"  : The personal branches can be used to develop new features or test new code. They are based on the main branch and should be merged back into the main branch once the code is tested and working.
 
 The folders in the repository are structured as follows:
-- "data"                : Contains the different .csv-files for different datasets. Each dataset has its own subfolder, which contains the specific .csv-files for the different splits (e.g., training, validation, test for ap, pa, fronal, etc.). The subfolders are structured as follows:
+- "data"                : Contains the different .csv-files for different datasets and the `dataset.py` file that contains the `CheXpertDataset` classs. Each dataset has its own subfolder, which contains the specific .csv-files for the different splits (e.g., training, validation, test for ap, pa, fronal, etc.). The subfolders are structured as follows:
   - **`original_data_unprocessed`**: Contains the original CSV files downloaded from the CheXpert dataset.
   - **`splitted`**: Contains a dataset that uses the validation set as test set. The training and validation set are created from the original training set using a 95/5 split.
   - **`new_90_5_5`**: Contains a dataset that uses the original training, validation and test set. All samples are used and split into 90/5/5.
