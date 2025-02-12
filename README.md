@@ -9,19 +9,32 @@ This repository contains all code for the ADLM Project "Cascade Learning for Per
 This repository contains several branches:
 - "main"                : Here all the code tested and working code of the development is merged into.
 - "cluster_productive"  : This branch contains the code that is ready to be ran on the cluster. It is updated from the main branch.
-- "development_-name-"  : The personal branches can be used as a sandbox to try some ideas. Should regularly be updated from the main branch.
-- "development_-issue-" : In these branches predefined tasks defined in notion are worked on. The origin of these branches is the main branch. When the task is finised in the main branch is pushed again.
+- "development_-name-"  : The personal branches can be used to develop new features or test new code. They are based on the main branch and should be merged back into the main branch once the code is tested and working.
 
 The folders in the repository are structured as follows:
-- "data"                : Contains the csv files
-  - "unprocessed"
-  - **`splitted`**: Contains the modified and preprocessed CSV files. This includes:
-    - `train.csv` and `valid.csv`: The processed training and validation sets.
-    - `ap_train.csv` and `ap_valid.csv`: The subsets of `train.csv` and `valid.csv` that only include `AP` samples.
-    - `pa_train.csv` and `pa_valid.csv`: The subsets of `train.csv` and `valid.csv` that only include `PA` samples.
-    - 'To-do': Consider creating a new subfolder, e.g., **`AP_PA`**, to organize datasets processed for different segmentation techniques (e.g., by **Gender**, **Age**, etc.).
-- "data_analysis"       : Contains the exploratory data analysis code.
+- "data"                : Contains the different .csv-files for different datasets. Each dataset has its own subfolder, which contains the specific .csv-files for the different splits (e.g., training, validation, test for ap, pa, fronal, etc.). The subfolders are structured as follows:
+  - **`original_data_unprocessed`**: Contains the original CSV files downloaded from the CheXpert dataset.
+  - **`splitted`**: Contains a dataset that uses the validation set as test set. The training and validation set are created from the original training set using a 95/5 split.
+  - **`new_90_5_5`**: Contains a dataset that uses the original training, validation and test set. All samples are used and split into 90/5/5.
+  - **`90_5_5`**: Contains a dataset that uses the original training and validation set. All samples are used and split into 90/5/5.
+  - **`original_data`**: Uses the original splits, splitted into the different views.
+  - **`only_valid_samples`**: Contains a dataset that uses the original validation set. From the training set a subset is created as test set that contains no uncertainty labels for the 5 labels: Atelectasis, Cardiomegaly, Consolidation, Edema, Pleural Effusion.
+- "data_analysis"       : Contains the exploratory data analysis code and the notebook that was used to split the .csv-files
+- final_models          : Contains the weights for the final models. Due to size restrictions only the weigths for the best models are stored here.
+- logs                  : Contains the logs of the different runs. Each subfolder contains the logs for a family of models. Within these subfolders the weights and parameters of the models are stored.
 - "model"               : Contains the code for all models.
+  - "multi-stage_model": Contains the code for the multi-stage models.
+  - "one_stage_model"  : Contains the code for the one-stage models.
+- "sbatch_scripts"      : Contains the sbatch scripts that are used to run the code on the cluster. Before running a scipt it has to be moved to the root directory of the repository.
+- "training_configs"    : Contains the different training configurations for the models as defined in the sbatch scripts.
+
+### Training and Testing
+
+For training and testing, the following files are used:
+
+- `test.ipynb` : This notebook is used to test the models. It loads the weights of the models and the test data and calculates the metrics for the models.
+- `train.ipynb` : This notebook is used for experimenting with the training of the models.
+- `train.py` : This script is used to train the models on the cluster. It uses the training configurations defined in the `training_configs` folder. And is started using the sbatch scripts from the `sbatch_scripts` folder.
 
 ## Prerequistes
 
@@ -47,7 +60,7 @@ Use the Black formatter (https://marketplace.visualstudio.com/items?itemName=ms-
 
 Execute a sbatch script:
 ```sh
-sbatch your_script_name.sh
+sbatch your_script_name.sh config train_configs/config.json
 ```
 
 Show current jobs running
