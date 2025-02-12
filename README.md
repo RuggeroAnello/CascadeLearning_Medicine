@@ -2,7 +2,7 @@
 
 ## Overview
 
-This repository contains all code for the ADLM Project "Cascade Learning for Personalized Medicine: Enhancing Diagnostic Accuracy Through Population-Specific Models".
+This repository contains all code for the ADLM Project "Cascade Learning for Personalized Medicine".
 
 ### Structure
 
