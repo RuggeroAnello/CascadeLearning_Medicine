@@ -17,7 +17,7 @@ The folders in the repository are structured as follows:
   - **`splitted`**: Contains a dataset that uses the validation set as test set. The training and validation set are created from the original training set using a 95/5 split.
   - **`new_90_5_5`**: Contains a dataset that uses the original training, validation and test set. All samples are used and split into 90/5/5.
   - **`90_5_5`**: Contains a dataset that uses the original training and validation set. All samples are used and split into 90/5/5.
-  - **`original_data`**: Uses the original splits, splitted into the different views.
+  - **`original_data`**: Uses the original splits, split into the different views.
   - **`only_valid_samples`**: Contains a dataset that uses the original validation set. From the training set a subset is created as test set that contains no uncertainty labels for the 5 labels: Atelectasis, Cardiomegaly, Consolidation, Edema, Pleural Effusion.
 - "data_analysis"       : Contains the exploratory data analysis code and the notebook that was used to split the .csv-files
 - final_models          : Contains the weights for the final models. Due to size restrictions only the weigths for the best models are stored here.
@@ -44,7 +44,7 @@ For training and testing, the following files are used:
 In order to work with the CheXpert small dataset is has to be downloaded first:
 1. Go to `../image_data/` relative to this repository: `cd ../image_data/`. If it not exists create it: `mkdir image_data`
 2. Download the CheXpert-v1.0-small dataset: `curl -L -o ./archive.zip https://www.kaggle.com/api/v1/datasets/download/willarevalo/chexpert-v10-small`
-3. Extract the dataset to `data`:  `unzip archive.zip`
+3. Extract the dataset to `data`: `unzip archive.zip`
 
 ### Python Setup
 
