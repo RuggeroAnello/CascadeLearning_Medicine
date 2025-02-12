@@ -56,7 +56,7 @@ class AbstractOneStageModel(torch.nn.Module):
 
         # Best model results
         self.best_val_loss = np.inf
-        self.best_auprc = -1 if "auprc" in self.params.get("metrics", []) else 0
+        self.best_auprc = -1 if "multilabel_auprc" in self.params.get("metrics", []) else 0
         self.best_mcc = -1 if "mcc" in self.params.get("metrics", []) else 0
         self.best_epoch = -1
 
