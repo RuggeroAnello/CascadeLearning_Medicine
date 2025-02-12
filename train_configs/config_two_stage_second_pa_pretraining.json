@@ -69,7 +69,6 @@
         "reduction": "mean",
         "metrics": [
             "accuracy",
-            "f1_score",
             "precision",
             "recall",
             "confusion_matrix",

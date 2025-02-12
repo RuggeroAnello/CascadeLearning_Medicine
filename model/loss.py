@@ -1,10 +1,13 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torchvision.ops as ops
 
 
 class MultilabelFocalLoss(nn.Module):
+    """
+    Multilabel Focal Loss for multilabel classification tasks. The focal loss can use in-class and inter-class weights.
+    """
+
     def __init__(
         self,
         gamma=2,
