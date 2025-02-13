@@ -11,6 +11,7 @@ from torcheval.metrics import (
     BinaryF1Score,
     BinaryAccuracy,
     BinaryAUROC,
+    BinaryPrecisionRecallCurve,
     AUC,
     MultilabelAccuracy,
     MultilabelAUPRC,
@@ -190,8 +191,8 @@ class AbstractMultiStageModel(torch.nn.Module):
                 self.val_metrics[label]["auroc"] = BinaryAUROC()
                 self.test_metrics[label]["auroc"] = BinaryAUROC()
             if "auc" in metrics:
-                self.val_metrics[label]["auc"] = AUC()
-                self.test_metrics[label]["auc"] = AUC()
+                self.val_metrics[label]["auc"] = BinaryPrecisionRecallCurve()
+                self.test_metrics[label]["auc"] = BinaryPrecisionRecallCurve()
             if "confusion_matrix" in metrics:
                 self.val_metrics[label]["confusion_matrix"] = BinaryConfusionMatrix()
                 self.test_metrics[label]["confusion_matrix"] = BinaryConfusionMatrix()
@@ -279,6 +280,7 @@ class AbstractMultiStageModel(torch.nn.Module):
         metrics: dict,
         multilabel_metrics: dict,
         loss_fn: torch.nn.Module,
+        test_labels: list = None,
     ) -> torch.Tensor:
         """
         Perform a single validation step om tje given batch.
@@ -288,6 +290,7 @@ class AbstractMultiStageModel(torch.nn.Module):
             metrics (dict): Dictionary containing the metrics to be computed.
             multilabel_metrics (dict): Dictionary containing the multilabel metrics to be computed.
             loss_fn (torch.nn.Module): Loss function to be used.
+            test_labels (list, optional): Idx of labels to test. The idx is the relative position of the labels in the output vector. The test labels have to be the of the same size as num_labels. Defaults to None.
 
         Returns:
             torch.Tensor: Loss value.
@@ -297,6 +300,10 @@ class AbstractMultiStageModel(torch.nn.Module):
 
         # Forward pass
         outputs = self.forward(images)
+
+        # Select only the test labels
+        if test_labels is not None:
+            outputs = outputs[:, test_labels]
 
         # Compute loss
         loss = loss_fn(outputs, labels)
@@ -330,7 +337,14 @@ class AbstractMultiStageModel(torch.nn.Module):
     def _set_model_to_eval():
         raise NotImplementedError
 
-    def test(self, test_dataset, name, tb_logger=None, log_wandb=False) -> pd.DataFrame:
+    def test(
+        self,
+        test_dataset,
+        name,
+        tb_logger=None,
+        log_wandb=False,
+        test_labels: list = None,
+    ) -> pd.DataFrame:
         """
         Test the model on the given dataset.
 
@@ -339,6 +353,7 @@ class AbstractMultiStageModel(torch.nn.Module):
             name (str): Name of the model.
             tb_logger (SummaryWriter, optional): Tensorboard logger to log the test results. Defaults to None.
             log_wandb (bool, optional): Whether to log the test results with wandb. Defaults to True.
+            test_labels (list, optional): Idx of labels to test. The idx is the relative position of the labels in the output vector. The test labels have to be the of the same size as num_labels. Defaults to None.
 
         Returns:
             pd.DataFrame: Dataframe containing the test results.
@@ -364,6 +379,12 @@ class AbstractMultiStageModel(torch.nn.Module):
 
         test_loss = 0.0
 
+        if test_labels is not None:
+            if len(test_labels) != self.get_num_labels(self.labels):
+                raise ValueError(
+                    "The number of test labels has to be the same as the number of labels in the dataset."
+                )
+
         with torch.no_grad():
             for label in self.test_metrics.keys():
                 for metric in self.test_metrics[label].values():
@@ -377,6 +398,7 @@ class AbstractMultiStageModel(torch.nn.Module):
                     metrics=self.test_metrics,
                     multilabel_metrics=self.test_metrics_multilabel,
                     loss_fn=loss_fn,
+                    test_labels=test_labels,
                 )
                 test_loss += loss.item()
 
