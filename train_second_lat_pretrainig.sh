@@ -21,5 +21,5 @@
 export PYTHONUNBUFFERED=true
 
 # Run the training script
-python train.py --config_path train_configs/config_two_stage_second_lat.json
+python train.py --config_path train_configs/config_two_stage_second_lat_pretraining.json
                                            

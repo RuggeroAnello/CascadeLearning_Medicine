@@ -1,11 +1,11 @@
 {
     "model_type": "one_stage_baseline",
-    "training_name": "Baseline_original_data",
+    "training_name": "Baseline",
     "task": "os_baseline_resnet50",
     "paths": {
         "data_root_dir": "../image_data/",
-        "train_csv_file_path": "./data/original_data/train.csv",
-        "val_csv_file_path": "./data/original_data/valid.csv"
+        "train_csv_file_path": "./data/90_5_5/train.csv",
+        "val_csv_file_path": "./data/90_5_5/valid.csv"
     },
     "targets": {
         "cardiomegaly": 7,
@@ -56,7 +56,7 @@
         "lr_decay_gamma": 0.9,
         "lr_decay_period": 2,
         "save_epoch": 5,
-        "batch_size": 256,
+        "batch_size": 512,
         "num_epochs": 100,
         "use_weighted_sampler": true,
         "label_smoothing": 0.2,

@@ -4,8 +4,8 @@
     "task": "second_stage_ap_multi_wrs_ls",
     "paths": {
         "data_root_dir": "../image_data/",
-        "train_csv_file_path": "./data/splitted/ap_train.csv",
-        "val_csv_file_path": "./data/splitted/ap_valid.csv"
+        "train_csv_file_path": "./data/90_5_5/ap_train.csv",
+        "val_csv_file_path": "./data/90_5_5/ap_valid.csv"
     },
     "targets": {
         "cardiomegaly": 7,

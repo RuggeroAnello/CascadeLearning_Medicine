@@ -1,11 +1,11 @@
 {
-    "model_type": "two_stage_second_fr",
-    "training_name": "5LabFR_NoPretraining",
-    "task": "second_stage_fr",
+    "model_type": "two_stage_second_lat",
+    "training_name": "Lat_not_Pretrained",
+    "task": "second_stage_lat",
     "paths": {
         "data_root_dir": "../image_data/",
-        "train_csv_file_path": "./data/splitted/fr_train.csv",
-        "val_csv_file_path": "./data/splitted/fr_valid.csv"
+        "train_csv_file_path": "./data/90_5_5/lat_train.csv",
+        "val_csv_file_path": "./data/90_5_5/lat_valid.csv"
     },
     "targets": {
         "cardiomegaly": 7,
@@ -56,13 +56,13 @@
         "lr_decay_gamma": 0.9,
         "lr_decay_period": 2,
         "save_epoch": 5,
-        "batch_size": 256,
+        "batch_size": 512,
         "num_epochs": 50,
         "use_weighted_sampler": true,
         "label_smoothing": 0.2,
         "input_channels": 1,
         "optimizer": "adam",
-        "num_workers": 22,
+        "num_workers": 0,
         "loss_fn": "multilabel_focal_loss",
         "pos_weights": true,
         "class_weights": true,
