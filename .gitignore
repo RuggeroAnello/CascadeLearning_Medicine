@@ -167,4 +167,7 @@ cython_debug/
 # Track models in final_model folder
 !final_models/splitted/*.pth
 
+# Model for pretraining
+!best_model_pretraining.pth
+
 wandb/
