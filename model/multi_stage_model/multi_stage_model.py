@@ -18,6 +18,7 @@ from torcheval.metrics import (
     BinaryConfusionMatrix,
 )
 from torchmetrics.classification import MultilabelMatthewsCorrCoef
+from torch.utils.tensorboard import SummaryWriter
 
 from model.loss import MultilabelFocalLoss
 
@@ -336,7 +337,7 @@ class AbstractMultiStageModel(torch.nn.Module):
         Args:
             test_dataset (torch.utils.data.Dataset): Dataset to test the model on.
             name (str): Name of the model.
-            tb_logger (torch.utils.tensorboard.SummaryWriter, optional): Tensorboard logger to log the test results. Defaults to None.
+            tb_logger (SummaryWriter, optional): Tensorboard logger to log the test results. Defaults to None.
             log_wandb (bool, optional): Whether to log the test results with wandb. Defaults to True.
 
         Returns:

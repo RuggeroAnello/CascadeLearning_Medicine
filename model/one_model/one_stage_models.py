@@ -20,7 +20,7 @@ from torcheval.metrics import (
     BinaryConfusionMatrix,
 )
 from torchmetrics.classification import MultilabelMatthewsCorrCoef
-
+from torch.utils.tensorboard import SummaryWriter
 from model.loss import MultilabelFocalLoss
 
 from tqdm import tqdm
@@ -496,7 +496,7 @@ class AbstractOneStageModel(torch.nn.Module):
         train_dataset: torch.utils.data.Dataset,
         val_dataset: torch.utils.data.Dataset,
         path: str,
-        tb_logger: torch.utils.tensorboard.SummaryWriter = None,
+        tb_logger: SummaryWriter = None,
         log_wandb: bool = True,
     ):
         """
@@ -506,7 +506,7 @@ class AbstractOneStageModel(torch.nn.Module):
             train_dataset (torch.utils.data.Dataset): Training dataset
             val_dataset (torch.utils.data.Dataset): Validation dataset
             path (str): Path where the model should be saved
-            tb_logger (torch.utils.tensorboard.SummaryWriter, optional): Tensorboard logger to log the training results. Defaults to None.
+            tb_logger (SummaryWriter, optional): Tensorboard logger to log the training results. Defaults to None.
             log_wandb (bool, optional): Whether to log the training results with wandb. Defaults to True.
         """
         # Prepare data loaders
@@ -642,7 +642,7 @@ class AbstractOneStageModel(torch.nn.Module):
                             metric_value = metric.compute()
                             if metric_name == "mcc":
                                 mcc = metric_value
-                            if metric_name == "auprc":
+                            if metric_name == "multilabel_auprc":
                                 auprc = metric_value
                     except ZeroDivisionError:
                         print("ZeroDivisionError")
