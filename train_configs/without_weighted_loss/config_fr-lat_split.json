@@ -8,7 +8,7 @@
         "val_csv_file_path": "../rugdev_Personalized_ML/data/splitted/valid.csv"
     },
     "targets": {
-        "Frontal/Lateral_mapped" : 20
+        "Frontal/Lateral_mapped": 20
     },
     "params": {
         "params_transform": {
@@ -60,7 +60,6 @@
         "loss_fn": "torch.nn.BCEWithLogitsLoss()",
         "metrics": [
             "accuracy",
-            "f1_score",
             "precision",
             "recall",
             "confusion_matrix",

@@ -6,10 +6,6 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 from PIL import Image
 
-# Ignore warnings
-# import warnings
-# warnings.filterwarnings("ignore")
-
 
 class CheXpertDataset(Dataset):
     """
@@ -32,9 +28,10 @@ class CheXpertDataset(Dataset):
             csv_file (str): Path to the csv file with annotations.
             root_dir (str): Directory where CheXpert images are stored.
             targets (dict): Dictionary of target labels.
+            transform (transforms.Compose, optional): Optional transform for images.
             uncertainty_mapping (bool): If True, maps uncertain labels (-1) based on column name.
                                         If False, keeps original values.
-            transform (transforms.Compose, optional): Optional transform for images.
+            label_smoothing (float): Label smoothing factor. If label smoothing should be used, you have to use uncertainty_mapping=True.
         """
         self.data = pd.read_csv(csv_file)
         self.root_dir = root_dir
@@ -51,9 +48,10 @@ class CheXpertDataset(Dataset):
 
         # Only apply uncertainty mapping if uncertainty_mapping is True
         if self.uncertainty_mapping:
+            # If label smoothing is enabled, apply label smoothing
             if self.label_smoothing > 0:
                 for column in target_columns:
-                    # Convert labels to float if they aren't already
+                    # Store the mapped values for calculating the class weights
                     self.zero = 0.0
                     self.one = 1.0
                     # Apply label smoothing: move the labels closer to 0.5
@@ -64,6 +62,7 @@ class CheXpertDataset(Dataset):
                         1 - self.label_smoothing
                     ) * self.one + self.label_smoothing * 0.5
 
+                    # Map uncertain labels as explained in Berrada et al. 2023
                     if column.lower() in ["edema", "atelectasis", "pleural_effusion"]:
                         self.data[column] = self.data[column].replace(
                             [-1, -1.0], self.one
@@ -73,6 +72,7 @@ class CheXpertDataset(Dataset):
                             [-1, -1.0], self.zero
                         )
             else:
+                # Map uncertain labels as explained in Berrada et al. 2023
                 for column in target_columns:
                     if column.lower() in ["edema", "atelectasis", "pleural_effusion"]:
                         self.data[column] = self.data[column].replace([-1, -1.0], 1)
@@ -85,14 +85,30 @@ class CheXpertDataset(Dataset):
         # Find unique labels
         self.unique_labels = np.unique(self.labels)
 
-        # Compute positive weight matrix
+        # Compute positive weight matrix for weighted loss functions
         self.compute_pos_weight_matrix()
+        # Compute class weights for focal loss
         self.compute_class_weights()
 
-    def __len__(self):
+    def __len__(self) -> int:
+        """
+        Returns the length of the dataset.
+
+        Returns:
+            int: Length of the dataset.
+        """
         return len(self.data)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx) -> tuple:
+        """
+        Returns the item at the given index.
+
+        Args:
+            idx (int): Index of the item.
+
+        Returns:
+            tuple: Tuple with the image and the target labels
+        """
         # Load image
         img_path = os.path.join(self.root_dir, self.data.iloc[idx, 0])
 
@@ -128,11 +144,8 @@ class CheXpertDataset(Dataset):
             pos_weight = num_neg / (num_pos if num_pos > 0 else 1)
             pos_weights.append(pos_weight)
 
-        # Create a tensor of shape [C]. If your target is 2D (or 3D with spatial dims) and you want the weight applied uniformly,
-        # you can reshape it to [C, 1, 1] as described in the BCEWithLogitsLoss docs.
+        # Create a tensor of shape [C]. C is the number of classes
         pos_weights = torch.tensor(pos_weights, dtype=torch.float32)
-        # Uncomment the following line if your target has shape [C, H, W] and you want to broadcast on the H and W dimensions:
-        # pos_weights = pos_weights.unsqueeze(1).unsqueeze(2)
         self.pos_weights = pos_weights
 
     def compute_class_weights(self):

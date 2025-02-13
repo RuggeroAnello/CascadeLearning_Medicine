@@ -66,7 +66,6 @@
         "loss_fn": "weighted_bce_loss",
         "metrics": [
             "accuracy",
-            "f1_score",
             "precision",
             "recall",
             "confusion_matrix",

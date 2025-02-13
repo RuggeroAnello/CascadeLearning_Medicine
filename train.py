@@ -1,6 +1,3 @@
-# NOTE: Use the argument parser to specify the path to the JSON config file for your trining.
-# Run "python train.py --help" to see the options.
-
 import argparse
 import json
 import os
@@ -10,12 +7,23 @@ import torchvision.transforms as transforms
 from model.one_model.one_stage_models import ResNet50OneStage, ResNet18OneStage
 from data.dataset import CheXpertDataset
 
-
 from datetime import datetime
 from pathlib import Path
 
+# Prevent kernel from dying
+os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 
-def preprocess_params(params_dict):
+
+def preprocess_params(params_dict: dict) -> dict:
+    """
+    Preprocesses the parameters dictionary.
+
+    Args:
+        params_dict (dict): Dictionary of parameters.
+
+    Returns:
+        dict: Preprocessed dictionary of parameters.
+    """
     for params_key, params_value in params_dict.items():
         if params_key == "params_transform":
             for transform_key, transform_value in params_value.items():
@@ -27,7 +35,16 @@ def preprocess_params(params_dict):
     return params_dict
 
 
-def read_json_config(file_path):
+def read_json_config(file_path: Path) -> tuple:
+    """
+    Reads the JSON config file.
+
+    Args:
+        file_path (Path): Path to the JSON config file.
+
+    Returns:
+        tuple: Tuple containing model type, training name, task, paths, targets, weights, params, and params_transform.
+    """
     with open(file_path, "r") as file:
         json_data = json.load(file)
 
@@ -55,14 +72,14 @@ def read_json_config(file_path):
 
 def main():
     """
-    Main function to train a model with different configurations.
+    Main function to train a model with the configurations specified in the JSON config file.
 
     Raises:
         ValueError: If an invalid model type is specified.
     """
     # Argument parser
     parser = argparse.ArgumentParser(
-        description="Train a model with different configurations."
+        description="Train a model with the configurations specified in the JSON config file."
     )
     parser.add_argument(
         "--config_path",
@@ -71,9 +88,6 @@ def main():
         help="Specify the path (relative to the personalize_ml repository's root directory) to the JSON config file for your training.",
     )
     args = parser.parse_args()
-    print("Started training script.")
-
-    print("\nImported all libraries")
 
     json_config_path = Path.cwd().joinpath(args.config_path)
     (
@@ -86,9 +100,6 @@ def main():
         params,
         params_transform,
     ) = read_json_config(json_config_path)
-
-    # To prevent the kernel from dying.
-    os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 
     transform = transforms.Compose(
         [
@@ -143,10 +154,6 @@ def main():
     print(f"Train dataset size: {len(train_dataset)}")
     print(f"Valid dataset size: {len(val_dataset)}")
 
-    assert len(train_dataset.labels) == len(train_dataset), (
-        "Mismatch between targets and dataset size!"
-    )
-
     if (
         params["loss_fn"] == "weighted_bce_loss"
         or params["loss_fn"] == "multilabel_focal_loss"
@@ -198,18 +205,14 @@ def main():
         path = os.path.join(dirname, "logs", f"{model.name}_{task}")
         if not os.path.exists(path):
             os.makedirs(path)
-            num_of_runs = 0
-        else:
-            num_of_runs = len(os.listdir(path))
         path = os.path.join(
             path,
             f"{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_{model_type}_{training_name}",
         )
         os.makedirs(path)
 
-        # Create tensorboard logger
+        # Create tensorboard logger, uncomment if needed
         # tb_logger = SummaryWriter(path)
-        tb_logger = None
 
         # Save the model parameters
         model.save_hparams(path)
