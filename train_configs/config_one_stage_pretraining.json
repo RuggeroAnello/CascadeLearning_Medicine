@@ -1,11 +1,11 @@
 {
     "model_type": "two_stage_pretraining",
-    "training_name": "ResNet18_PreTraining_90_5_5",
+    "training_name": "ResNet18_PreTraining_5lab_new_90_5_5",
     "task": "pretraining",
     "paths": {
         "data_root_dir": "../image_data/",
-        "train_csv_file_path": "./data/90_5_5/train.csv",
-        "val_csv_file_path": "./data/90_5_5/valid.csv"
+        "train_csv_file_path": "./data/new_90_5_5/train.csv",
+        "val_csv_file_path": "./data/new_90_5_5/valid.csv"
     },
     "targets": {
         "cardiomegaly": 7,
@@ -59,7 +59,7 @@
         "batch_size": 256,
         "num_epochs": 50,
         "use_weighted_sampler": true,
-        "label_smoothing": 0.2,
+        "label_smoothing": 0.4,
         "input_channels": 1,
         "optimizer": "adam",
         "num_workers": 22,
