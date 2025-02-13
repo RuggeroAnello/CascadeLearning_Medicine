@@ -52,7 +52,7 @@
                 1.25
             ]
         },
-        "lr": 0.00001,
+        "lr": 5e-5,
         "lr_decay_gamma": 0.9,
         "lr_decay_period": 2,
         "save_epoch": 5,
