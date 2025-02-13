@@ -59,7 +59,7 @@
         "batch_size": 256,
         "num_epochs": 50,
         "use_weighted_sampler": true,
-        "label_smoothing": 0.4,
+        "label_smoothing": 0.2,
         "input_channels": 1,
         "optimizer": "adam",
         "num_workers": 22,
