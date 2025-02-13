@@ -1,11 +1,11 @@
 {
     "model_type": "one_stage_baseline",
-    "training_name": "os_fr-data_pos-class-weights",
+    "training_name": "os_fr-data_original_data",
     "task": "os_baseline_fr_resnet50",
     "paths": {
         "data_root_dir": "../image_data/",
-        "train_csv_file_path": "./data/splitted/fr_train.csv",
-        "val_csv_file_path": "./data/splitted/fr_valid.csv"
+        "train_csv_file_path": "./data/original_data/fr_train.csv",
+        "val_csv_file_path": "./data/original_data/fr_valid.csv"
     },
     "targets": {
         "cardiomegaly": 7,

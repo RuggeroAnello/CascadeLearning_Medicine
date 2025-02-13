@@ -1,11 +1,11 @@
 {
     "model_type": "two_stage_second_pa",
-    "training_name": "PA_not_Pretrained",
+    "training_name": "PA_not_Pretr_original_data",
     "task": "second_stage_pa_multi_wrs_ls",
     "paths": {
         "data_root_dir": "../image_data/",
-        "train_csv_file_path": "./data/splitted/pa_train.csv",
-        "val_csv_file_path": "./data/splitted/pa_valid.csv"
+        "train_csv_file_path": "./data/original_data/pa_train.csv",
+        "val_csv_file_path": "./data/original_data/pa_valid.csv"
     },
     "targets": {
         "cardiomegaly": 7,
