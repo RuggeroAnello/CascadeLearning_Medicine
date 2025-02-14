@@ -17,6 +17,10 @@ The folders in the repository are structured as follows:
   - **`splitted`**: Contains a dataset that uses the validation set as test set. The training and validation set are created from the original training set using a 95/5 split.
   - **`new_90_5_5`**: Contains a dataset that uses the original training, validation and test set. All samples are used and split into 90/5/5.
   - **`90_5_5`**: Contains a dataset that uses the original training and validation set. All samples are used and split into 90/5/5.
+    - This dataset additionally contains a subset of the test set where the exact same amount of AP, PA, and Lateral images are used.
+    - `fr_lat_test_balanced.csv`: Contains the balanced test set with the same anount of frontal and lateral images for fr/lat split.
+    - `fr_test_balanced.csv`: Contains the balanced test set with the same anount of ap and pa images for ap/pa split.
+    - `test_balanced.csv`: Contains the balanced test set with the same anount of ap, pa, and lateral images for the baseline and three-stage model.
   - **`original_data`**: Uses the original splits, split into the different views.
   - **`only_valid_samples`**: Contains a dataset that uses the original validation set. From the training set a subset is created as test set that contains no uncertainty labels for the 5 labels: Atelectasis, Cardiomegaly, Consolidation, Edema, Pleural Effusion.
 - "data_analysis"       : Contains the exploratory data analysis code and the notebook that was used to split the .csv-files
