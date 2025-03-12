@@ -1,8 +1,8 @@
-# Personalized_ML
+# Cascade Learning for Group Specific Medicine: A Multi-Stage Approach
 
 ## Overview
 
-This repository contains all code for the ADLM Project "Cascade Learning for Personalized Medicine".
+This repository contains all code for the ADLM Project "Cascade Learning for Group Specific Medicine: A Multi-Stage Approach".
 - [Final Poster](https://drive.google.com/file/d/1EkQ_hAKBh8RUGeB-2BrN-3_xa2t5FjM8/view)  
 - [Final Report](https://drive.google.com/file/d/1rQK0Mq4l933d5yoLzDki55Pnilmo0z0E/view)
 
