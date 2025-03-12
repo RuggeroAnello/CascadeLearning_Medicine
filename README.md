@@ -3,8 +3,8 @@
 ## Overview
 
 This repository contains all code for the ADLM Project "Cascade Learning for Personalized Medicine".
-- [Final Poster]([https://drive.google.com/your-poster-link](https://drive.google.com/file/d/1EkQ_hAKBh8RUGeB-2BrN-3_xa2t5FjM8/view))  
-- [Final Report]([https://drive.google.com/your-report-link](https://drive.google.com/file/d/1rQK0Mq4l933d5yoLzDki55Pnilmo0z0E/view))
+- [Final Poster](https://drive.google.com/file/d/1EkQ_hAKBh8RUGeB-2BrN-3_xa2t5FjM8/view)  
+- [Final Report](https://drive.google.com/file/d/1rQK0Mq4l933d5yoLzDki55Pnilmo0z0E/view)
 
 ### Structure
 
